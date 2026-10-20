@@ -1,0 +1,40 @@
+# tombstone/log.clsx - Logger simple con niveles y buffer para tests.
+export class Logger {
+    public var level: String;
+    public var entries: String[];
+
+    function main(level: String) {
+        var l = level.lower();
+        if (!(l == "debug" || l == "info" || l == "warn" || l == "error")) {
+            l = "info";
+        };
+        me.level = l;
+        me.entries = [];
+    }
+
+    function rank(level: String) -> int {
+        if (level == "debug") { return 10; };
+        if (level == "info") { return 20; };
+        if (level == "warn") { return 30; };
+        if (level == "error") { return 40; };
+        return 20;
+    }
+
+    function enabled(level: String) -> bool {
+        return me.rank(level) >= me.rank(me.level);
+    }
+
+    function log(level: String, message: String) {
+        if (!me.enabled(level)) { return; };
+        var line = "[" + level + "] " + message;
+        me.entries.push(line);
+        print(line);
+    }
+
+    function debug(message: String) { me.log("debug", message); }
+    function info(message: String) { me.log("info", message); }
+    function warn(message: String) { me.log("warn", message); }
+    function error(message: String) { me.log("error", message); }
+
+    function clear() { me.entries = []; }
+};

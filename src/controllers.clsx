@@ -1,8 +1,10 @@
 # src/controllers.clsx - Controladores del proyecto demo.
 #
-# `Controller` (del motor) aporta request, validación y helpers de respuesta.
-# `NotesController` usa `Model` sobre una base SQLite en memoria.
-from "tombstone" import Controller, Model, Request, Response, ValidationResult;
+# El controller valida y mapea a DTOs; delega en Actions/Repository.
+from "tombstone" import Controller, ModelRow, Request, Response;
+from "./actions" import CreateNoteAction, DeleteNoteAction, RestoreNoteAction;
+from "./dtos" import NoteInput, RegisterUserInput;
+from "./repositories" import NoteRepository;
 
 export class RegistrationController: Controller {
     function main(req: Request) {
@@ -18,20 +20,32 @@ export class RegistrationController: Controller {
         if (v.failed()) {
             return me.invalid(v);
         };
-        return me.created({
-            ok: true,
-            name: v.data["name"],
-            email: v.data["email"]
-        });
+        var input = RegisterUserInput(
+            v.data["name"], v.data["email"], v.data["password"]
+        );
+        var out = input.public_record();
+        return me.created({ok: true, name: out["name"], email: out["email"]});
     }
 };
 
 export class NotesController: Controller {
-    public var notes: Model;
+    public var notes: NoteRepository;
+    public var create_note: CreateNoteAction;
+    public var delete_note: DeleteNoteAction;
+    public var restore_note: RestoreNoteAction;
 
-    function main(req: Request, notes: Model) {
+    function main(
+        req: Request,
+        notes: NoteRepository,
+        create_note: CreateNoteAction,
+        delete_note: DeleteNoteAction,
+        restore_note: RestoreNoteAction
+    ) {
         super.main(req);
         me.notes = notes;
+        me.create_note = create_note;
+        me.delete_note = delete_note;
+        me.restore_note = restore_note;
     }
 
     function index() -> Response {
@@ -39,7 +53,7 @@ export class NotesController: Controller {
     }
 
     function trashed() -> Response {
-        return me.ok({count: me.notes.only_trashed().count()});
+        return me.ok({count: me.notes.trashed_count()});
     }
 
     function store() -> Response {
@@ -47,7 +61,7 @@ export class NotesController: Controller {
         if (v.failed()) {
             return me.invalid(v);
         };
-        var row = me.notes.create({title: v.data["title"]});
+        var row = me.create_note.handle(NoteInput(v.data["title"]));
         return me.created({
             id: row.get("id"),
             title: row.get_str("title"),
@@ -69,10 +83,10 @@ export class NotesController: Controller {
 
     function destroy() -> Response {
         var id = me.param("id");
-        if (!me.notes.exists(id)) {
+        if (!me.notes.find(id).exists) {
             return me.not_found();
         };
-        var n = me.notes.delete(id);
+        var n = me.delete_note.handle(id);
         if (n == 0) { return me.not_found(); };
         return me.ok({deleted: true, id: id});
     }
@@ -82,7 +96,7 @@ export class NotesController: Controller {
         if (!me.notes.trashed(id)) {
             return me.not_found();
         };
-        var n = me.notes.restore(id);
+        var n = me.restore_note.handle(id);
         if (n == 0) { return me.not_found(); };
         var row = me.notes.find(id);
         return me.ok({

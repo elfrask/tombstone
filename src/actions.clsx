@@ -1,0 +1,46 @@
+# src/actions.clsx - Casos de uso de notas (Controller -> Action -> Repository).
+from "tombstone" import Action, ModelRow;
+from "./dtos" import NoteInput;
+from "./repositories" import NoteRepository;
+
+export class CreateNoteAction: Action {
+    public var notes: NoteRepository;
+
+    function main(notes: NoteRepository) {
+        me.notes = notes;
+    }
+
+    function name() -> String { return "create_note"; }
+
+    function handle(input: NoteInput) -> ModelRow {
+        return me.notes.create(input);
+    }
+};
+
+export class DeleteNoteAction: Action {
+    public var notes: NoteRepository;
+
+    function main(notes: NoteRepository) {
+        me.notes = notes;
+    }
+
+    function name() -> String { return "delete_note"; }
+
+    function handle(id: String) -> int {
+        return me.notes.delete(id);
+    }
+};
+
+export class RestoreNoteAction: Action {
+    public var notes: NoteRepository;
+
+    function main(notes: NoteRepository) {
+        me.notes = notes;
+    }
+
+    function name() -> String { return "restore_note"; }
+
+    function handle(id: String) -> int {
+        return me.notes.restore(id);
+    }
+};

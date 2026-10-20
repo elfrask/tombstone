@@ -9,6 +9,7 @@
 #
 # Los rows son `ModelRow` con `data: Record<String, String>`; `get/set/save`.
 import "orm" as orm;
+from "./event" import Event, EventBus;
 
 function require_ident(name: String, what: String) {
     if (name.length == 0) {
@@ -507,6 +508,7 @@ export class Model {
     public var primary_key: String;
     public var has_timestamps: bool;
     public var uses_soft_deletes: bool;
+    public var events: EventBus;
 
     function main(o: orm::Orm, table: String, primary_key: String) {
         require_ident(table, "tabla");
@@ -516,6 +518,29 @@ export class Model {
         me.primary_key = primary_key;
         me.has_timestamps = false;
         me.uses_soft_deletes = false;
+        me.events = EventBus();
+    }
+
+    function use_events(bus: EventBus) -> Model {
+        me.events = bus;
+        return me;
+    }
+
+    function on(event_name: String, handler: (Event) -> int) -> Model {
+        me.events.on(event_name, handler);
+        return me;
+    }
+
+    function emit_before(event_name: String, payload: Record<String, String>) {
+        var e = Event(event_name, payload);
+        me.events.dispatch(e);
+        if (e.cancelled) {
+            throw("Model: evento " + event_name + " cancelado");
+        };
+    }
+
+    function emit_after(event_name: String, payload: Record<String, String>) {
+        me.events.dispatch(Event(event_name, payload));
     }
 
     function timestamps() -> Model {
@@ -580,10 +605,10 @@ export class Model {
             if (!values.has("created_at")) { values["created_at"] = stamp; };
             values["updated_at"] = stamp;
         };
+        me.emit_before("creating", values);
         var id = insert_values(me.orm, me.table, values);
-        if (!values.has(me.primary_key)) {
-            values[me.primary_key] = id.toString();
-        };
+        if (!values.has(me.primary_key)) { values[me.primary_key] = id.toString(); };
+        me.emit_after("created", values);
         var row = me.find(values[me.primary_key]);
         if (!row.exists) {
             return ModelRow(
@@ -595,11 +620,18 @@ export class Model {
     }
 
     function update(id: String, values: Record<String, String>) -> int {
-        return me.query().where(me.primary_key, "=", id).update(values);
+        var payload = merge_records(values, {id: id});
+        me.emit_before("updating", payload);
+        var n = me.query().where(me.primary_key, "=", id).update(values);
+        if (n > 0) { me.emit_after("updated", merge_records(values, {id: id})); };
+        return n;
     }
 
     function delete(id: String) -> int {
-        return me.query().where(me.primary_key, "=", id).delete();
+        me.emit_before("deleting", {id: id});
+        var n = me.query().where(me.primary_key, "=", id).delete();
+        if (n > 0) { me.emit_after("deleted", {id: id}); };
+        return n;
     }
 
     function destroy(ids: String[]) -> int {
@@ -609,12 +641,18 @@ export class Model {
     }
 
     function force_delete(id: String) -> int {
-        return me.query().with_trashed().where(me.primary_key, "=", id).force_delete();
+        me.emit_before("force_deleting", {id: id});
+        var n = me.query().with_trashed().where(me.primary_key, "=", id).force_delete();
+        if (n > 0) { me.emit_after("force_deleted", {id: id}); };
+        return n;
     }
 
     function restore(id: String) -> int {
         if (!me.uses_soft_deletes) { return 0; };
-        return me.query().only_trashed().where(me.primary_key, "=", id).restore();
+        me.emit_before("restoring", {id: id});
+        var n = me.query().only_trashed().where(me.primary_key, "=", id).restore();
+        if (n > 0) { me.emit_after("restored", {id: id}); };
+        return n;
     }
 
     function trashed(id: String) -> bool {

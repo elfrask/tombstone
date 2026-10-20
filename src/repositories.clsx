@@ -1,0 +1,23 @@
+# src/repositories.clsx - Repositorio de notas sobre Model (capa de dominio).
+from "tombstone" import Model, ModelRow;
+from "./dtos" import NoteInput;
+
+export class NoteRepository {
+    public var notes: Model;
+
+    function main(notes: Model) {
+        me.notes = notes;
+    }
+
+    function find(id: String) -> ModelRow { return me.notes.find(id); }
+    function count() -> int { return me.notes.count(); }
+    function trashed_count() -> int { return me.notes.only_trashed().count(); }
+    function trashed(id: String) -> bool { return me.notes.trashed(id); }
+
+    function create(input: NoteInput) -> ModelRow {
+        return me.notes.create(input.to_record());
+    }
+
+    function delete(id: String) -> int { return me.notes.delete(id); }
+    function restore(id: String) -> int { return me.notes.restore(id); }
+};

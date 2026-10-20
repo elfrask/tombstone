@@ -1,9 +1,9 @@
-# run.ps1 - tests de Model contra SQLite (se ejecutan desde la raíz del repo).
+# run.ps1 - tests de Model/ORM/eventos contra SQLite (desde la raíz del repo).
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 $repo = (Resolve-Path (Join-Path $here "..\..\..\..")).Path
 $clx = Join-Path $repo "target\debug\clx.exe"
-$entries = @((Join-Path $here "model.clsx"), (Join-Path $here "orm.clsx"))
+$entries = @((Join-Path $here "model.clsx"), (Join-Path $here "orm.clsx"), (Join-Path $here "events.clsx"))
 
 if (-not (Test-Path $clx)) {
     Write-Host "ERROR: falta $clx (compila con: cargo build --bin clx)"

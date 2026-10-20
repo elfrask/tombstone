@@ -1,0 +1,53 @@
+# tests/db/events.clsx - Eventos de Model sobre SQLite.
+import "sqlite" as sqlite;
+import "check" as check;
+from "tombstone" import Database, Event, EventBus;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var db = Database(sqlite::SqliteDriver());
+    db.connect(":memory:");
+    db.exec("CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, created_at INTEGER, updated_at INTEGER, deleted_at INTEGER)");
+    var notes = db.table("notes").timestamps().soft_deletes();
+    var bus = EventBus();
+    notes.use_events(bus);
+
+    var created = 0;
+    var updated = 0;
+    var deleted = 0;
+    var restored = 0;
+    bus.on("created", (e: Event) -> int { created = created + 1; return 1; });
+    bus.on("updated", (e: Event) -> int { updated = updated + 1; return 1; });
+    bus.on("deleted", (e: Event) -> int { deleted = deleted + 1; return 1; });
+    bus.on("restored", (e: Event) -> int { restored = restored + 1; return 1; });
+
+    var row = notes.create({title: "Hola"});
+    notes.update(row.get("id"), {title: "Chau"});
+    notes.delete(row.get("id"));
+    notes.restore(row.get("id"));
+
+    check::assertEq("event.model.created", created, 1);
+    check::assertEq("event.model.updated", updated, 1);
+    check::assertEq("event.model.deleted", deleted, 1);
+    check::assertEq("event.model.restored", restored, 1);
+    check::assertEq("event.model.count", notes.count(), 1);
+    check::assertEqStr("event.model.title", notes.find(row.get("id")).get_str("title"), "Chau");
+
+    var cancelling = EventBus();
+    cancelling.on("creating", (e: Event) -> int { e.cancel(); return 1; });
+    var guarded = db.table("notes").timestamps().soft_deletes();
+    guarded.use_events(cancelling);
+    var cancelled = false;
+    try {
+        guarded.create({title: "No"});
+    } catch (err) {
+        cancelled = true;
+    };
+    check::assertTrue("event.model.cancel", cancelled);
+    check::assertEq("event.model.cancel.count", guarded.count(), 1);
+
+    db.close();
+    if (check::fails() > 0) { return 1; };
+    return 0;
+};

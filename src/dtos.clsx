@@ -1,0 +1,51 @@
+# src/dtos.clsx - Objetos de entrada/salida de casos de uso.
+export class RegisterUserInput {
+    public var name: String;
+    public var email: String;
+    public var password: String;
+
+    function main(name: String, email: String, password: String) {
+        me.name = name;
+        me.email = email;
+        me.password = password;
+    }
+
+    function public_record() -> Record<String, String> {
+        var r: Record<String, String> = {name: me.name, email: me.email};
+        return r;
+    }
+};
+
+export class NoteInput {
+    public var title: String;
+
+    function main(title: String) {
+        me.title = title;
+    }
+
+    function to_record() -> Record<String, String> {
+        var r: Record<String, String> = {title: me.title};
+        return r;
+    }
+};
+
+export class NoteOutput {
+    public var id: String;
+    public var title: String;
+    public var created_at: String;
+
+    function main(id: String, title: String, created_at: String) {
+        me.id = id;
+        me.title = title;
+        me.created_at = created_at;
+    }
+
+    function to_record() -> Record<String, String> {
+        var r: Record<String, String> = {
+            id: me.id,
+            title: me.title,
+            created_at: me.created_at
+        };
+        return r;
+    }
+};

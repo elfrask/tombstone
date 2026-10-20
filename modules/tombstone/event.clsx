@@ -1,0 +1,85 @@
+# tombstone/event.clsx - EventBus síncrono + listeners tipados.
+#
+#   bus.on("note.created", (e: Event) -> int {
+#       print(e.payload["id"]);
+#       return 1;
+#   });
+#   bus.dispatch(Event("note.created", {id: "1"}));
+export class Event {
+    public var event_name: String;
+    public var payload: Record<String, String>;
+    public var cancelled: bool;
+    public var stopped: bool;
+
+    function main(name: String, payload: Record<String, String>) {
+        me.event_name = name;
+        me.payload = payload;
+        me.cancelled = false;
+        me.stopped = false;
+    }
+
+    function cancel() { me.cancelled = true; }
+    function stop() { me.stopped = true; }
+};
+
+export class Listener {
+    public var event_name: String;
+    public var handler: (Event) -> int;
+
+    function main(event_name: String, handler: (Event) -> int) {
+        me.event_name = event_name;
+        me.handler = handler;
+    }
+
+    function run(e: Event) -> int {
+        var f = me.handler;
+        return f(e);
+    }
+};
+
+export class EventBus {
+    public var listeners: Listener[];
+
+    function main() {
+        me.listeners = [];
+    }
+
+    function on(event_name: String, handler: (Event) -> int) -> EventBus {
+        me.listeners.push(Listener(event_name, handler));
+        return me;
+    }
+
+    function has_listeners(event_name: String) -> bool {
+        for each l in (me.listeners) {
+            if (l.event_name == event_name) { return true; };
+        };
+        return false;
+    }
+
+    function count(event_name: String) -> int {
+        var n = 0;
+        for each l in (me.listeners) {
+            if (l.event_name == event_name) { n = n + 1; };
+        };
+        return n;
+    }
+
+    # Devuelve cuántos listeners corrieron. Un listener puede `stop()` la cadena.
+    function dispatch(e: Event) -> int {
+        var n = 0;
+        for each l in (me.listeners) {
+            if (l.event_name == e.event_name) {
+                l.run(e);
+                n = n + 1;
+                if (e.stopped) { break; };
+            };
+        };
+        return n;
+    }
+
+    function dispatch_name(name: String, payload: Record<String, String>) -> Event {
+        var e = Event(name, payload);
+        me.dispatch(e);
+        return e;
+    }
+};

@@ -1,23 +1,18 @@
 # tombstone/database.clsx - Conexión de base de datos + fábrica de Models.
-#
-# El motor es agnóstico: recibe un `orm::Driver` (SQLite en el demo).
-#
-#   import "sqlite" as sqlite;
-#   var db = Database(sqlite::SqliteDriver());
-#   db.connect(":memory:");
-#   db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
-#   var users = db.table("users");
 import "orm" as orm;
 from "./model" import Model;
 from "./schema" import DbSchema;
+from "./event" import EventBus;
 
 export class Database {
     public var driver: orm::Driver;
     public var orm: orm::Orm;
+    public var events: EventBus;
 
     function main(driver: orm::Driver) {
         me.driver = driver;
         me.orm = orm::Orm(driver);
+        me.events = EventBus();
     }
 
     function connect(path: String) -> int { return me.driver.connect(path); }
@@ -28,12 +23,17 @@ export class Database {
     function commit() -> int { return me.orm.commit(); }
     function rollback() -> int { return me.orm.rollback(); }
 
+    function set_events(bus: EventBus) -> Database {
+        me.events = bus;
+        return me;
+    }
+
     function table(name: String) -> Model {
-        return Model(me.orm, name, "id");
+        return Model(me.orm, name, "id").use_events(me.events);
     }
 
     function table_with_key(name: String, primary_key: String) -> Model {
-        return Model(me.orm, name, primary_key);
+        return Model(me.orm, name, primary_key).use_events(me.events);
     }
 
     function schema() -> DbSchema {

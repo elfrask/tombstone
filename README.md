@@ -22,6 +22,8 @@ Fase 0 completa y ampliada:
 - Formularios: urlencoded, multipart (campos + `FormFile`) y JSON en `Request`.
 - Validación de request: reglas pipe + builder `field()/schema()`; `Controller`.
 - Model: `Model/Query/ModelRow` sobre `modules/orm`; SQLite en el demo.
+- Capa de aplicación: `EventBus` + model events, `Logger`, `Action`/`Service`,
+  DTOs, `NoteRepository`, `ServiceProvider` y `ApplicationServices` tipados.
 - ORM de aplicación: migraciones (`MigrationRunner` + `DbSchema`), relaciones
   (`has_many`/`has_one`/`belongs_to`), timestamps, soft deletes y factories.
 - Demo: landing real con CMX, iconos, CSS/JS, API JSON, formulario y notas.
@@ -52,12 +54,20 @@ tombstone/
 │   │   ├── schema.clsx      # DbSchema/Blueprint/Column (migraciones)
 │   │   ├── migration.clsx   # Migration + MigrationRunner
 │   │   ├── factory.clsx     # Factory (datos para tests/seeds)
+│   │   ├── event.clsx       # EventBus + Event/Listener
+│   │   ├── log.clsx         # Logger
+│   │   └── action.clsx      # Action/Service
 │   │   └── types/           # interfaces de props CMX (HTML + UI)
 │   └── tombstone-icons/     # iconos SVG para las vistas
 ├── src/
 │   ├── main.clsx            # proyecto demo (rutas + Template)
 │   ├── components.clsx      # componentes CMX (funciones -> Cmx)
 │   ├── controllers.clsx     # RegistrationController / NotesController
+│   ├── config.clsx          # AppConfig (env)
+│   ├── dtos.clsx            # DTOs de casos de uso
+│   ├── repositories.clsx    # NoteRepository
+│   ├── actions.clsx         # Create/Delete/RestoreNoteAction
+│   ├── services.clsx        # ApplicationServices + providers + bootstrap
 │   ├── migrations.clsx      # esquema versionado del demo
 │   └── views.clsx           # páginas (Landing, Gallery) con <Componente />
 ├── public/                  # css / js / favicon servidos por /public
@@ -142,9 +152,9 @@ Model/SQLite (desde la raíz; usa `:memory:`):
 powershell -File cls-repositories\tombstone\tests\db\run.ps1
 ```
 
-Cobertura actual: **9 tests unitarios PASS** (request/response/router/app,
+Cobertura actual: **10 tests unitarios PASS** (request/response/router/app,
 template, view, types, validation/form/multipart, cookies/CORS/JSON/static,
-status), **56 checks DB PASS** (Model CRUD + migraciones, relaciones,
+status), **64 checks DB PASS** (Model CRUD + migraciones, relaciones, eventos,
 timestamps, soft deletes y factories) y **56 checks de integraci�n PASS**
 (landing, UI kit, API, formulario validado, Model SQLite + soft delete/restore,
 cookies, CORS, static, 404/405).
@@ -374,6 +384,24 @@ var many = UserFactory(users).create_many(3, {});
 `Factory.make` mezcla la definición con overrides y avanza una secuencia;
 `create` persiste y `create_many` crea N filas.
 
+### Capa de aplicación
+
+El demo separa controller, DTO, Action y Repository:
+
+- `ApplicationServices` (`src/services.clsx`) es el contenedor tipado:
+  `config`, `db`, `events`, `logger`, `notes`, `create_note`, `delete_note`,
+  `restore_note`.
+- `ServiceProvider` expone `register(services)`/`boot(services)`; `bootstrap`
+  construye el bus, comparte `db.set_events(events)` y registra providers.
+- `NoteRepository` envuelve `Model` y es la única puerta de datos para las
+  Actions.
+- `NoteInput`/`RegisterUserInput` son DTOs explícitos; `NotesController` valida
+  y delega en Actions.
+- `EventBus` emite `created/updated/deleted/restored` desde `Model`; los
+  listeners del `DomainProvider` los loguean.
+- `ModelRow.save()`/`ModelRow.delete()` no emiten eventos (solo las operaciones
+  de `Model`); documentado como límite actual.
+
 ### API
 
 - `App`: `get/post/put/patch/delete_route/options`, `use`, `serve_static`,
@@ -392,6 +420,9 @@ var many = UserFactory(users).create_many(3, {});
 - `Model`: ver secci�n Model (`all`, `find`, `create`, `update`, `delete`,
   `force_delete`, `restore`, `with_trashed`, `only_trashed`, relaciones,
   `where`, `paginate`, agregados, ...); `ModelRow`/`Query`/`Paginator`.
+- `Event`/`EventBus`/`Listener`: eventos síncronos y model events.
+- `Logger`: niveles + buffer de test.
+- `Action`/`Service`: marcadores de capa; providers en el demo.
 - `DbSchema`/`Blueprint`/`Column`: schema builder y migraciones.
 - `Migration`/`MigrationRunner`: migraciones versionadas (`run`, `rollback`,
   `reset`, `status`).

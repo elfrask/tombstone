@@ -1,0 +1,50 @@
+from "tombstone" import Event, EventBus, Logger;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var bus = EventBus();
+    var hits = 0;
+    bus.on("note.created", (e: Event) -> int {
+        hits = hits + 1;
+        return 1;
+    });
+    bus.on("note.created", (e: Event) -> int {
+        hits = hits + 10;
+        return 1;
+    });
+    var e = bus.dispatch_name("note.created", {id: "7"});
+    check::assertEq("event.listeners", bus.count("note.created"), 2);
+    check::assertEq("event.hits", hits, 11);
+    check::assertEqStr("event.payload", e.payload["id"], "7");
+    check::assertTrue("event.not.cancelled", !e.cancelled);
+
+    var stopBus = EventBus();
+    var stops = 0;
+    stopBus.on("x", (ev: Event) -> int {
+        stops = stops + 1;
+        ev.stop();
+        return 1;
+    });
+    stopBus.on("x", (ev: Event) -> int {
+        stops = stops + 100;
+        return 1;
+    });
+    var empty: Record<String, String> = {};
+    stopBus.dispatch_name("x", empty);
+    check::assertEq("event.stop", stops, 1);
+
+    var log = Logger("warn");
+    log.debug("d");
+    log.info("i");
+    log.warn("w");
+    log.error("e");
+    check::assertEq("log.entries", log.entries.length, 2);
+    check::assertEqStr("log.level", log.level, "warn");
+    log.clear();
+    check::assertEq("log.clear", log.entries.length, 0);
+
+    if (check::fails() > 0) { return 1; };
+    return 0;
+};

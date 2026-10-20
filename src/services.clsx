@@ -1,0 +1,80 @@
+# src/services.clsx - Contenedor tipado, providers y bootstrap del demo.
+from "tombstone" import Database, Event, EventBus, Logger;
+from "./config" import AppConfig;
+from "./repositories" import NoteRepository;
+from "./actions" import CreateNoteAction, DeleteNoteAction, RestoreNoteAction;
+
+export class ApplicationServices {
+    public var config: AppConfig;
+    public var db: Database;
+    public var events: EventBus;
+    public var logger: Logger;
+    public var notes: NoteRepository;
+    public var create_note: CreateNoteAction;
+    public var delete_note: DeleteNoteAction;
+    public var restore_note: RestoreNoteAction;
+
+    function main(db: Database, config: AppConfig, events: EventBus) {
+        me.config = config;
+        me.db = db;
+        me.events = events;
+        me.logger = Logger(config.log_level);
+        me.notes = NoteRepository(db.table("notes").timestamps().soft_deletes());
+        me.create_note = CreateNoteAction(me.notes);
+        me.delete_note = DeleteNoteAction(me.notes);
+        me.restore_note = RestoreNoteAction(me.notes);
+    }
+};
+
+export class ServiceProvider {
+    function register(services: ApplicationServices) -> int { return 0; }
+    function boot(services: ApplicationServices) -> int { return 0; }
+};
+
+export class CoreProvider: ServiceProvider {
+    function register(services: ApplicationServices) -> int {
+        services.logger.info("provider core registrado");
+        return 1;
+    }
+
+    function boot(services: ApplicationServices) -> int {
+        services.logger.info("bootstrap " + services.config.app_name +
+                             " env=" + services.config.environment);
+        return 1;
+    }
+};
+
+export class DomainProvider: ServiceProvider {
+    function register(services: ApplicationServices) -> int {
+        return 1;
+    }
+
+    function boot(services: ApplicationServices) -> int {
+        services.logger.info("provider domain listo");
+        return 1;
+    }
+};
+
+export function bootstrap(db: Database, config: AppConfig) -> ApplicationServices {
+    var events = EventBus();
+    db.set_events(events);
+    var services = ApplicationServices(db, config, events);
+    var providers: ServiceProvider[] = [];
+    providers.push(CoreProvider());
+    providers.push(DomainProvider());
+    for each p in (providers) { p.register(services); };
+    for each p in (providers) { p.boot(services); };
+    services.events.on("created", (e: Event) -> int {
+        services.logger.info("evento created id=" + e.payload["id"]);
+        return 1;
+    });
+    services.events.on("updated", (e: Event) -> int {
+        services.logger.info("evento updated id=" + e.payload["id"]);
+        return 1;
+    });
+    services.events.on("deleted", (e: Event) -> int {
+        services.logger.info("evento deleted id=" + e.payload["id"]);
+        return 1;
+    });
+    return services;
+};

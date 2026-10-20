@@ -33,6 +33,9 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 | `schema.clsx` | `DbSchema`, `Blueprint`, `Column` (migraciones) |
 | `migration.clsx` | `Migration`, `MigrationRunner` |
 | `factory.clsx` | `Factory` (datos para tests/seeds) |
+| `event.clsx` | `Event`, `EventBus`, `Listener` |
+| `log.clsx` | `Logger` (niveles + buffer) |
+| `action.clsx` | `Action`, `Service` (marcadores de capa) |
 | `types/*.clsx` | interfaces de props CMX (una por etiqueta HTML + UI) |
 | `mod.clsx` | barrel público (motor + tipos) |
 
@@ -122,6 +125,30 @@ validación): `blueprint`, `create`, `alter`, `drop`, `has_table`,
 `get/first/count/pluck/value`, agregados, `update/delete`, `force_delete`,
 `restore`, `with_trashed`, `only_trashed`.
 `Factory`: `make`, `create`, `create_many`.
+
+## Eventos, logging y capas de aplicación
+
+`EventBus` es síncrono y tipado por `Event`/`Record<String,String>`:
+
+```clx
+var bus = EventBus();
+bus.on("note.created", (e: Event) -> int {
+    print(e.payload["id"]);
+    return 1;
+});
+bus.dispatch_name("note.created", {id: "1"});
+```
+
+`Model` emite `creating/created`, `updating/updated`, `deleting/deleted`,
+`force_deleting/force_deleted`, `restoring/restored`; `creating/updating/...`
+pueden cancelar con `e.cancel()` (lanza error). Compartir un bus:
+`db.set_events(bus)` antes de `db.table(...)`.
+
+`Logger` tiene niveles `debug/info/warn/error` y buffer `entries` para tests.
+`Action` y `Service` son marcadores de capa; las clases concretas implementan
+`handle`. El demo usa `ApplicationServices` (campos tipados), `ServiceProvider`
+(`register`/`boot`), `NoteRepository`, `NoteInput`/`RegisterUserInput` y
+Actions para el flujo `Controller -> DTO -> Action -> Repository -> Model`.
 
 ## Uso
 

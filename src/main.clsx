@@ -26,6 +26,8 @@ from "tombstone" import App, Request, Response, CorsOptions, CookieOptions, Temp
 from "tombstone" import render, json_response, json_response_raw, json_string_array;
 from "tombstone" import parse_cookies, serialize_cookie, system_pid, system_uptime_ms;
 from "tombstone" import Database, MigrationRunner, serve;
+from "./config" import load_config;
+from "./services" import bootstrap, ApplicationServices;
 from "./controllers" import RegistrationController, NotesController;
 from "./migrations" import CreateInitialSchema;
 from "./views" import Landing, LandingPageProps, Gallery, GalleryPageProps;
@@ -72,19 +74,18 @@ function main(args: String[]) -> int {
     print("=== Tombstone ===");
     print("pid:", system_pid(), "uptime_ms:", system_uptime_ms());
 
+    var config = load_config();
     var db = Database(sqlite::SqliteDriver());
-    db.connect(":memory:");
+    db.connect(config.db_path);
     MigrationRunner(db.orm).add(CreateInitialSchema()).run();
-    var notes = db.table("notes").timestamps().soft_deletes();
-
+    var services: ApplicationServices = bootstrap(db, config);
     var app = App();
     app.cors(CorsOptions());
     app.use("logging", (req: Request) -> Response {
-        print("-> " + req.http_method + " " + req.path);
+        services.logger.info("-> " + req.http_method + " " + req.path);
         return Response.status_only(0);
     });
     app.serve_static("/public", PUBLIC_DIR);
-
     # Landing: componentes CMX (NavBar/HeroBanner/TerminalPanel/SiteFooter).
     app.get("/", (req: Request) -> Response {
         var landing: LandingPageProps = { id: "top" };
@@ -130,27 +131,27 @@ function main(args: String[]) -> int {
 
     # Model sobre SQLite en memoria.
     app.get("/api/notes", (req: Request) -> Response {
-        return NotesController(req, notes).index();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).index();
     });
 
     app.post("/api/notes", (req: Request) -> Response {
-        return NotesController(req, notes).store();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).store();
     });
 
     app.get("/api/notes/trashed", (req: Request) -> Response {
-        return NotesController(req, notes).trashed();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).trashed();
     });
 
     app.delete_route("/api/notes/{id}", (req: Request) -> Response {
-        return NotesController(req, notes).destroy();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).destroy();
     });
 
     app.post("/api/notes/{id}/restore", (req: Request) -> Response {
-        return NotesController(req, notes).restore();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).restore();
     });
 
     app.get("/api/notes/{id}", (req: Request) -> Response {
-        return NotesController(req, notes).show();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).show();
     });
 
     app.get("/cookies", (req: Request) -> Response {

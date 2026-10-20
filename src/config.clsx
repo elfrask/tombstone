@@ -1,0 +1,30 @@
+# src/config.clsx - Configuración de aplicación del demo (no es `modules/config`).
+from "tombstone" import system_env;
+
+export class AppConfig {
+    public var app_name: String;
+    public var environment: String;
+    public var debug: bool;
+    public var db_path: String;
+    public var log_level: String;
+
+    function main() {
+        me.app_name = "Tombstone";
+        me.environment = "development";
+        me.debug = true;
+        me.db_path = ":memory:";
+        me.log_level = "info";
+    }
+};
+
+export function load_config() -> AppConfig {
+    var c = AppConfig();
+    var env = system_env("TOMBSTONE_ENV");
+    if (env != "") { c.environment = env; };
+    var db = system_env("TOMBSTONE_DB");
+    if (db != "") { c.db_path = db; };
+    var level = system_env("TOMBSTONE_LOG_LEVEL");
+    if (level != "") { c.log_level = level; };
+    c.debug = c.environment != "production";
+    return c;
+};

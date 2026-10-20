@@ -1,0 +1,11 @@
+# tombstone/action.clsx - Marcadores para Actions/Services de aplicación.
+#
+# Las clases concretas implementan `handle(input) -> output` con tipos propios;
+# estas bases solo documentan la capa y permiten agruparlas.
+export class Action {
+    function name() -> String { return "action"; }
+};
+
+export class Service {
+    function name() -> String { return "service"; }
+};
