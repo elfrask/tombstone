@@ -1,0 +1,57 @@
+# src/controllers.clsx - Controladores del proyecto demo.
+#
+# `Controller` (del motor) aporta request, validación y helpers de respuesta.
+# `NotesController` usa `Model` sobre una base SQLite en memoria.
+from "tombstone" import Controller, Model, Request, Response, ValidationResult;
+
+export class RegistrationController: Controller {
+    function main(req: Request) {
+        super.main(req);
+    }
+
+    function store() -> Response {
+        var v = me.validate({
+            name: "required|string|min:2|max:40",
+            email: "required|email",
+            password: "required|min:8|confirmed"
+        });
+        if (v.failed()) {
+            return me.invalid(v);
+        };
+        return me.created({
+            ok: true,
+            name: v.data["name"],
+            email: v.data["email"]
+        });
+    }
+};
+
+export class NotesController: Controller {
+    public var notes: Model;
+
+    function main(req: Request, notes: Model) {
+        super.main(req);
+        me.notes = notes;
+    }
+
+    function index() -> Response {
+        return me.ok({count: me.notes.count()});
+    }
+
+    function store() -> Response {
+        var v = me.validate({title: "required|string|min:1|max:120"});
+        if (v.failed()) {
+            return me.invalid(v);
+        };
+        var row = me.notes.create({title: v.data["title"]});
+        return me.created({id: row.get("id"), title: row.get_str("title")});
+    }
+
+    function show() -> Response {
+        var row = me.notes.find(me.param("id"));
+        if (!row.exists) {
+            return me.not_found();
+        };
+        return me.ok({id: row.get("id"), title: row.get_str("title")});
+    }
+};

@@ -1,0 +1,109 @@
+# types/media.clsx - Imágenes, multimedia y embebidos.
+
+from "./types/global" import ElementProps;
+
+export interface ImgProps extends ElementProps {
+    src: String,
+    alt: String,
+    width: Int,
+    height: Int,
+    loading: String,
+    decoding: String,
+    srcSet: String,
+    sizes: String,
+    crossOrigin: String,
+    referrerPolicy: String,
+    useMap: String,
+    isMap: Bool,
+};
+
+export interface PictureProps extends ElementProps {
+};
+
+export interface SourceProps extends ElementProps {
+    src: String,
+    srcSet: String,
+    sizes: String,
+    media: String,
+    type: String,
+};
+
+export interface VideoProps extends ElementProps {
+    src: String,
+    width: Int,
+    height: Int,
+    controls: Bool,
+    autoPlay: Bool,
+    loopPlayback: Bool,
+    muted: Bool,
+    poster: String,
+    preload: String,
+    playsInline: Bool,
+    crossOrigin: String,
+};
+
+export interface AudioProps extends ElementProps {
+    src: String,
+    controls: Bool,
+    autoPlay: Bool,
+    loopPlayback: Bool,
+    muted: Bool,
+    preload: String,
+    crossOrigin: String,
+};
+
+export interface TrackProps extends ElementProps {
+    src: String,
+    kind: String,
+    srcLang: String,
+    label: String,
+    isDefault: Bool,
+};
+
+export interface CanvasProps extends ElementProps {
+    width: Int,
+    height: Int,
+};
+
+export interface MapProps extends ElementProps {
+    name: String,
+};
+
+export interface AreaProps extends ElementProps {
+    alt: String,
+    coords: String,
+    shape: String,
+    href: String,
+    target: String,
+    rel: String,
+    download: String,
+};
+
+export interface ObjectProps extends ElementProps {
+    data: String,
+    type: String,
+    width: Int,
+    height: Int,
+    name: String,
+};
+
+export interface EmbedProps extends ElementProps {
+    src: String,
+    type: String,
+    width: Int,
+    height: Int,
+};
+
+export interface IframeProps extends ElementProps {
+    src: String,
+    srcdoc: String,
+    name: String,
+    width: String,
+    height: String,
+    title: String,
+    allow: String,
+    allowFullScreen: Bool,
+    sandbox: String,
+    loading: String,
+    referrerPolicy: String,
+};

@@ -1,0 +1,38 @@
+# tombstone/database.clsx - Conexión de base de datos + fábrica de Models.
+#
+# El motor es agnóstico: recibe un `orm::Driver` (SQLite en el demo).
+#
+#   import "sqlite" as sqlite;
+#   var db = Database(sqlite::SqliteDriver());
+#   db.connect(":memory:");
+#   db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
+#   var users = db.table("users");
+import "orm" as orm;
+from "./model" import Model;
+
+export class Database {
+    public var driver: orm::Driver;
+    public var orm: orm::Orm;
+
+    function main(driver: orm::Driver) {
+        me.driver = driver;
+        me.orm = orm::Orm(driver);
+    }
+
+    function connect(path: String) -> int { return me.driver.connect(path); }
+    function close() -> int { return me.driver.close(); }
+    function exec(sql: String) -> int { return me.orm.exec(sql); }
+    function query(sql: String) -> orm::ResultSet { return me.orm.query(sql); }
+    function begin() -> int { return me.orm.begin(); }
+    function commit() -> int { return me.orm.commit(); }
+    function rollback() -> int { return me.orm.rollback(); }
+
+    function table(name: String) -> Model {
+        return Model(me.orm, name, "id");
+    }
+
+    function table_with_key(name: String, primary_key: String) -> Model {
+        return Model(me.orm, name, primary_key);
+    }
+
+};

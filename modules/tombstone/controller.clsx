@@ -1,0 +1,97 @@
+# tombstone/controller.clsx - Controlador base para handlers HTTP.
+#
+# Un controlador envuelve un Request y ofrece helpers de respuesta/validación:
+#
+#   class UsersController: Controller {
+#       function main(req: Request) { super.main(req); }
+#       function store() -> Response {
+#           var v = me.validate({name: "required|min:2"});
+#           if (v.failed()) { return me.invalid(v); };
+#           return me.created({name: v.data["name"]});
+#       }
+#   };
+#
+#   app.post("/users", (req: Request) -> Response {
+#       return UsersController(req).store();
+#   });
+from "httpd" import Request, Response, FormFile, ValidationResult, Schema;
+from "./json" import json_encode;
+
+export class Controller {
+    public var req: Request;
+
+    function main(req: Request) {
+        me.req = req;
+    }
+
+    # --- request ----------------------------------------------------------
+    function input(name: String) -> String { return me.req.input(name); }
+    function all() -> Record<String, String> { return me.req.all(); }
+    function param(name: String) -> String { return me.req.param(name); }
+    function header(name: String) -> String { return me.req.header(name); }
+    function has_file(name: String) -> bool { return me.req.has_file(name); }
+    function file(name: String) -> FormFile { return me.req.file(name); }
+
+    # --- validación -------------------------------------------------------
+    function validate(rules: Record<String, String>) -> ValidationResult {
+        return me.req.validate(rules);
+    }
+
+    function validate_schema(schema: Schema) -> ValidationResult {
+        return me.req.validate_schema(schema);
+    }
+
+    # Lanza si falla; útil cuando el App captura la excepción.
+    function validated(rules: Record<String, String>) -> Record<String, String> {
+        var v = me.validate(rules);
+        if (v.failed()) {
+            throw("Validación fallida");
+        };
+        return v.data;
+    }
+
+    # --- respuestas -------------------------------------------------------
+    function json(value: JSON, status: int) -> Response {
+        var res = Response.json_response(json_encode(value));
+        res.status = status;
+        return res;
+    }
+
+    function ok(value: JSON) -> Response { return me.json(value, 200); }
+    function created(value: JSON) -> Response { return me.json(value, 201); }
+    function accepted(value: JSON) -> Response { return me.json(value, 202); }
+
+    function no_content() -> Response {
+        return Response.status_only(204);
+    }
+
+    function invalid(result: ValidationResult) -> Response {
+        return me.json({errors: result.errors}, 422);
+    }
+
+    function invalid_errors(errors: Record<String, String>) -> Response {
+        return me.json({errors: errors}, 422);
+    }
+
+    function text(message: String) -> Response {
+        return Response.text(message);
+    }
+
+    function html(content: String) -> Response {
+        return Response.html(content);
+    }
+
+    function error(message: String, status: int) -> Response {
+        var res = Response(status, message);
+        res.headers["content-type"] = "text/plain; charset=utf-8";
+        return res;
+    }
+
+    function redirect(url: String, status: int) -> Response {
+        return Response.redirect(url, status);
+    }
+
+    function not_found() -> Response {
+        return Response.not_found();
+    }
+};

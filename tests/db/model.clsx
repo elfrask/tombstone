@@ -1,0 +1,50 @@
+# tests/db/model.clsx - Regresión de Model/Query (SQLite en memoria).
+#
+# Se ejecuta desde la raíz del repo CLS (el shim de sqlite resuelve por CWD):
+#   target\debug\clx.exe run cls-repositories\tombstone\tests\db\model.clsx
+import "sqlite" as sqlite;
+from "tombstone" import Database;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var db = Database(sqlite::SqliteDriver());
+    db.connect(":memory:");
+    db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT)");
+    var users = db.table("users");
+
+    var ana = users.create({name: "Ana", email: "ana@example.com"});
+    check::assertTrue("model.create.exists", ana.exists);
+    check::assertEqStr("model.create.name", ana.get_str("name"), "Ana");
+    check::assertEq("model.count", users.count(), 1);
+
+    var found = users.find(ana.get("id"));
+    check::assertTrue("model.find", found.exists);
+    check::assertEqStr("model.find.email", found.get_str("email"), "ana@example.com");
+
+    found.set("name", "Ana Maria");
+    check::assertEq("model.save", found.save(), 1);
+    check::assertEqStr("model.saved", users.find(ana.get("id")).get_str("name"), "Ana Maria");
+
+    var beto = users.create({name: "Beto", email: "beto@example.com"});
+    check::assertEq("model.count2", users.count(), 2);
+    check::assertEqStr("model.query.first", users.query().order_by("id", "desc").first().get_str("name"), "Beto");
+    check::assertEq("model.query.count", users.where("id", ">", "0").count(), 2);
+    check::assertEq("model.max", int(users.max("id")), 2);
+    check::assertEqStr("model.value", users.value("name"), "Ana Maria");
+
+    var page = users.paginate(1, 1);
+    check::assertEq("model.page.total", page.total, 2);
+    check::assertEq("model.page.data", page.data.length, 1);
+
+    check::assertEq("model.delete", users.delete(beto.get("id")), 1);
+    check::assertEq("model.count3", users.count(), 1);
+    check::assertEqStr("model.find.missing", users.find("999").get_str("name"), "");
+    db.close();
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+};

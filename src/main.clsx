@@ -5,21 +5,28 @@
 #   clx run src/main.clsx -- 8080 test   (autotest en memoria, sin sockets)
 #
 # Rutas:
-#   GET  /                 landing (Template + CMX + iconos)
+#   GET  /                 landing (Template + componentes CMX + iconos)
+#   GET  /ui               galería de componentes con props tipados
 #   GET  /api/health       JSON
 #   GET  /api/users        JSON (lista)
 #   GET  /users/{id}       JSON con params de ruta
 #   POST /api/echo         JSON con el body recibido
 #   GET  /cookies          cookies recibidas
 #   GET  /set-cookie       Set-Cookie + redirect
-#   GET  /public/*         archivos estáticos (modules/io)
+#   POST /api/register     formulario/JSON validado (Controller)
+#   GET  /api/notes        conteo (Model SQLite)
+#   POST /api/notes        crea una nota desde un formulario (Model + validación)
+#   GET  /api/notes/{id}   nota por id (Model)
+#   GET  /public/*         archivos estáticos (fs del nodo)
+import "sqlite" as sqlite;
 from "tombstone" import App, Request, Response, CorsOptions, CookieOptions, Template;
 from "tombstone" import render, json_response, json_response_raw, json_string_array;
 from "tombstone" import parse_cookies, serialize_cookie, system_pid, system_uptime_ms;
-from "tombstone" import serve;
-from "./views" import nav, home_view;
+from "tombstone" import Database, serve;
+from "./controllers" import RegistrationController, NotesController;
+from "./views" import Landing, LandingPageProps, Gallery, GalleryPageProps;
 
-# El shim de `io` y el de `socket` se resuelven relativos al CWD: este demo se
+# Los shims de `fs` y `socket` se resuelven relativos al CWD: este demo se
 # ejecuta desde la raíz del repo CLS.
 const PUBLIC_DIR = "cls-repositories/tombstone/public";
 
@@ -61,6 +68,11 @@ function main(args: String[]) -> int {
     print("=== Tombstone ===");
     print("pid:", system_pid(), "uptime_ms:", system_uptime_ms());
 
+    var db = Database(sqlite::SqliteDriver());
+    db.connect(":memory:");
+    db.exec("CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL)");
+    var notes = db.table("notes");
+
     var app = App();
     app.cors(CorsOptions());
     app.use("logging", (req: Request) -> Response {
@@ -69,15 +81,25 @@ function main(args: String[]) -> int {
     });
     app.serve_static("/public", PUBLIC_DIR);
 
-    # Landing: una sola pantalla (hero + terminal + footer).
+    # Landing: componentes CMX (NavBar/HeroBanner/TerminalPanel/SiteFooter).
     app.get("/", (req: Request) -> Response {
-        var header = nav();
+        var landing: LandingPageProps = { id: "top" };
+        var landingProps: Record<String, Value> = landing;
         var t = page_template("Tombstone — framework HTTP en CLS puro", "Framework HTTP para CLS: sockets, router, middleware, CORS, cookies y vistas CMX.");
         t.set_body_class("landing");
         t.add_meta_prop("property", "og:title", "Tombstone");
         t.add_meta_prop("property", "og:description", "Framework HTTP para CLS. Sockets, router, middleware, CORS y vistas CMX.");
         t.add_meta_prop("property", "og:type", "website");
-        return Response.html(render(t.render(home_view(header))));
+        return Response.html(render(t.render((<Landing {...landingProps} />))));
+    });
+
+    # Galería de componentes con props tipados por interfaces.
+    app.get("/ui", (req: Request) -> Response {
+        var gallery: GalleryPageProps = { id: "gallery" };
+        var galleryProps: Record<String, Value> = gallery;
+        var t = page_template("UI Kit — Tombstone", "Componentes CMX con props tipados.");
+        t.set_body_class("landing");
+        return Response.html(render(t.render((<Gallery {...galleryProps} />))));
     });
 
     app.get("/api/health", (req: Request) -> Response {
@@ -95,6 +117,24 @@ function main(args: String[]) -> int {
 
     app.post("/api/echo", (req: Request) -> Response {
         return json_response({recibido: req.body, content_type: req.header("content-type")});
+    });
+
+    # Formulario o JSON; Request.validate + Controller.
+    app.post("/api/register", (req: Request) -> Response {
+        return RegistrationController(req).store();
+    });
+
+    # Model sobre SQLite en memoria.
+    app.get("/api/notes", (req: Request) -> Response {
+        return NotesController(req, notes).index();
+    });
+
+    app.post("/api/notes", (req: Request) -> Response {
+        return NotesController(req, notes).store();
+    });
+
+    app.get("/api/notes/{id}", (req: Request) -> Response {
+        return NotesController(req, notes).show();
     });
 
     app.get("/cookies", (req: Request) -> Response {
@@ -120,8 +160,23 @@ function main(args: String[]) -> int {
         print("--- autotest ---");
         print(summary("GET /api/health", app.handle("GET /api/health HTTP/1.1\r\nHost: x\r\n\r\n")));
         print(summary("GET /", app.handle("GET / HTTP/1.1\r\nHost: x\r\n\r\n")));
+        print(summary("GET /ui", app.handle("GET /ui HTTP/1.1\r\nHost: x\r\n\r\n")));
         print(summary("GET /users/42", app.handle("GET /users/42 HTTP/1.1\r\nHost: x\r\n\r\n")));
         print(summary("GET /nope", app.handle("GET /nope HTTP/1.1\r\nHost: x\r\n\r\n")));
+
+        var regBody = "name=Ana&email=ana%40example.com&password=secret123&password_confirmation=secret123";
+        var regRaw = "POST /api/register HTTP/1.1\r\nHost: x\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: " + regBody.length.toString() + "\r\n\r\n" + regBody;
+        print(summary("POST /api/register", app.handle(regRaw)));
+
+        var badBody = "name=A&email=no&password=1";
+        var badRaw = "POST /api/register HTTP/1.1\r\nHost: x\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: " + badBody.length.toString() + "\r\n\r\n" + badBody;
+        print(summary("POST /api/register invalid", app.handle(badRaw)));
+
+        var noteBody = "title=Hola";
+        var noteRaw = "POST /api/notes HTTP/1.1\r\nHost: x\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: " + noteBody.length.toString() + "\r\n\r\n" + noteBody;
+        print(summary("POST /api/notes", app.handle(noteRaw)));
+        print(summary("GET /api/notes/1", app.handle("GET /api/notes/1 HTTP/1.1\r\nHost: x\r\n\r\n")));
+        print(summary("GET /api/notes", app.handle("GET /api/notes HTTP/1.1\r\nHost: x\r\n\r\n")));
         print("--- fin autotest ---");
         return 0;
     };

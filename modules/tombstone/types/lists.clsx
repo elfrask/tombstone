@@ -1,0 +1,25 @@
+# types/lists.clsx - Listas.
+
+from "./types/global" import ElementProps;
+
+export interface UlProps extends ElementProps {
+};
+
+export interface OlProps extends ElementProps {
+    start: Int,
+    reversed: Bool,
+    type: String,
+};
+
+export interface LiProps extends ElementProps {
+    value: String,
+};
+
+export interface DlProps extends ElementProps {
+};
+
+export interface DtProps extends ElementProps {
+};
+
+export interface DdProps extends ElementProps {
+};

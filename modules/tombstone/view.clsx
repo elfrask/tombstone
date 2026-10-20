@@ -54,13 +54,16 @@ function sortKeys(ks: String[]) -> String[] {
     return a;
 }
 
-# ` key="valor"` por cada prop; prop `true` -> atributo booleano desnudo.
+# ` key="valor"` por cada prop; `true` -> atributo booleano desnudo, `false`
+# -> se omite (HTML booleano).
 export function attrs(c: Cmx) -> String {
     var ks = sortKeys(c.props.keys());
     var out = "";
     for each k in (ks) {
         if (c.props[k] == true) {
             out = out + " " + k;
+        } elif (c.props[k] == false) {
+            # atributo booleano apagado: no se emite
         } else {
             out = out + " " + k + "=\"" + e(str(c.props[k])) + "\"";
         };
@@ -80,8 +83,11 @@ export function render(c: Cmx) -> String {
         return e(c.tag);
     };
     if (c.isComponent) {
-        var html: String = c.tagCallable(c.props, c.children);
-        return html;
+        # Contrato de componentes: devuelven `Cmx` (subárbol). Para HTML crudo
+        # usar `raw(html)`. `tagCallable` es dinámico; el renderer resuelve el
+        # Cmx devuelto recursivamente.
+        var out: Cmx = c.tagCallable(c.props, c.children);
+        return render(out);
     };
     var tag: String = c.tag;
     if (tag == "raw") {
@@ -94,14 +100,19 @@ export function render(c: Cmx) -> String {
         };
         return rawOut;
     };
-    var inner = "";
-    for each ch in (c.children) {
-        inner = inner + render(ch);
-    };
     if (isVoid(tag)) {
         return "<" + tag + attrs(c) + " />";
     };
-    return "<" + tag + attrs(c) + ">" + inner + "</" + tag + ">";
+    return "<" + tag + attrs(c) + ">" + renderChildren(c.children) + "</" + tag + ">";
+}
+
+# Renderiza una lista de children (para slots de componentes).
+export function renderChildren(children: Cmx[]) -> String {
+    var out = "";
+    for each ch in (children) {
+        out = out + render(ch);
+    };
+    return out;
 }
 
 # --- helpers de composición (bucles y layouts) ----------------------------

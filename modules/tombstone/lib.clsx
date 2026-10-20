@@ -1,6 +1,6 @@
 # tombstone/lib.clsx - Información del sistema (pid / uptime / env).
 #
-# FFI mínima y portable; la red y el FS viven en `modules/socket` y `modules/io`.
+# FFI mínima y portable; la red vive en `modules/socket`; el static usa `fs` del nodo.
 when (os: windows) {
     extension "kernel32.dll" as C {
         function GetCurrentProcessId() -> int;

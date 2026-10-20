@@ -1,0 +1,30 @@
+# types/misc.clsx - Figuras, detalles, diálogos y Web Components.
+
+from "./types/global" import ElementProps;
+
+export interface FigureProps extends ElementProps {
+};
+
+export interface FigcaptionProps extends ElementProps {
+};
+
+export interface DetailsProps extends ElementProps {
+    open: Bool,
+};
+
+export interface SummaryProps extends ElementProps {
+};
+
+export interface DialogProps extends ElementProps {
+    open: Bool,
+};
+
+export interface MenuProps extends ElementProps {
+};
+
+export interface TemplateProps extends ElementProps {
+};
+
+export interface SlotProps extends ElementProps {
+    name: String,
+};

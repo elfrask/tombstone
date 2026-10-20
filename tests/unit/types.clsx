@@ -1,0 +1,66 @@
+from "tombstone" import AnchorProps, AnchorFullProps, ButtonProps;
+from "tombstone" import render;
+import "check" as check;
+
+# Extensión de una interface de etiqueta HTML.
+interface NavLinkProps extends AnchorProps {
+    label: String,
+};
+
+function Btn(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    return (<button type={str(props.type)}>{str(props.label)}</button>);
+};
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var anchor: AnchorProps = {
+        id: "",
+        className: "",
+        href: "/x",
+        target: "_self",
+        rel: ""
+    };
+    check::assertEqStr("types.anchor.href", anchor.href, "/x");
+
+    var full: AnchorFullProps = {
+        id: "",
+        className: "",
+        href: "/full",
+        target: "_self",
+        rel: "",
+        download: "",
+        hrefLang: "",
+        type: "",
+        referrerPolicy: "",
+        ping: ""
+    };
+    check::assertEqStr("types.anchor.full.href", full.href, "/full");
+
+    var link: NavLinkProps = {
+        id: "",
+        className: "",
+        href: "/y",
+        target: "_self",
+        rel: "",
+        label: "Hola & mundo"
+    };
+    check::assertEqStr("types.extend.label", link.label, "Hola & mundo");
+
+    var button: ButtonProps = {
+        id: "",
+        className: "",
+        type: "button",
+        disabled: false
+    };
+    check::assertEqStr("types.button.type", button.type, "button");
+
+    # La interface se usa en el call-site; el componente recibe el Record runtime.
+    var composable: Record<String, Value> = {type: "button", label: "OK"};
+    check::assertEqStr("types.component", render((<Btn {...composable} />)), "<button type=\"button\">OK</button>");
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+}

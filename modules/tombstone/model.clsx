@@ -1,0 +1,513 @@
+# tombstone/model.clsx - Active Record / query builder sobre `modules/orm`.
+#
+# `Model` es agnóstico al motor: recibe un `orm::Orm` (SQLite en el demo).
+# Cada tabla se usa como `db.table("users")` o con una subclase:
+#
+#   class User extends Model {
+#       function main(db: Database) { super.main(db.orm, "users", "id"); }
+#   };
+#
+# Los rows son `ModelRow` con `data: Record<String, String>`; `get/set/save`.
+import "orm" as orm;
+
+function require_ident(name: String, what: String) {
+    if (name.length == 0) {
+        throw("Model: " + what + " vacío");
+    };
+    for each c in (name.toChar()) {
+        var n = ord(c);
+        if (!((n >= 65 && n <= 90) || (n >= 97 && n <= 122) ||
+              (n >= 48 && n <= 57) || n == 95)) {
+            throw("Model: " + what + " inválido: " + name);
+        };
+    };
+}
+
+function cell_value(c: orm::Cell) -> String {
+    if (c.kind == orm::KIND_NULL) { return ""; };
+    if (c.kind == orm::KIND_INT) { return str(c.i); };
+    if (c.kind == orm::KIND_FLOAT) { return str(c.f); };
+    return c.s;
+}
+
+# Los atributos viajan como String (form/JSON); SQLite aplica afinidad de
+# columna, por lo que un "42" se guarda/compara como entero en una columna INT.
+function value_cell(v: String) -> orm::Cell {
+    return orm::cText(v);
+}
+
+function merge_records(a: Record<String, String>, b: Record<String, String>) -> Record<String, String> {
+    var out: Record<String, String> = {};
+    var ka: String[] = a.keys();
+    for each k in (ka) { out[k] = a[k]; };
+    var kb: String[] = b.keys();
+    for each k in (kb) { out[k] = b[k]; };
+    return out;
+}
+
+function insert_values(o: orm::Orm, table: String, values: Record<String, String>) -> int {
+    var cols: String[] = [];
+    var cells: orm::Cell[] = [];
+    var keys: String[] = values.keys();
+    if (keys.length == 0) { throw("Model: insert sin columnas"); };
+    for each k in (keys) {
+        require_ident(k, "columna");
+        cols.push(k);
+        cells.push(value_cell(values[k]));
+    };
+    return o.insert(table, cols, cells);
+}
+
+function update_values(
+    o: orm::Orm, table: String, primary_key: String,
+    id: String, values: Record<String, String>
+) -> int {
+    var cols: String[] = [];
+    var cells: orm::Cell[] = [];
+    var keys: String[] = values.keys();
+    for each k in (keys) {
+        require_ident(k, "columna");
+        cols.push(k);
+        cells.push(value_cell(values[k]));
+    };
+    if (cols.length == 0) { return 0; };
+    var where = primary_key + " = ?";
+    var params: orm::Cell[] = [value_cell(id)];
+    return o.update(table, cols, cells, where, params);
+}
+
+function delete_id(o: orm::Orm, table: String, primary_key: String, id: String) -> int {
+    var where = primary_key + " = ?";
+    var params: orm::Cell[] = [value_cell(id)];
+    return o.deleteWhere(table, where, params);
+}
+
+export class ModelRow {
+    public var orm: orm::Orm;
+    public var table: String;
+    public var primary_key: String;
+    public var data: Record<String, String>;
+    public var exists: bool;
+
+    function main(
+        o: orm::Orm, table: String, primary_key: String,
+        data: Record<String, String>, exists: bool
+    ) {
+        me.orm = o;
+        me.table = table;
+        me.primary_key = primary_key;
+        me.data = data;
+        me.exists = exists;
+    }
+
+    function get(name: String) -> String {
+        if (me.data.has(name)) { return me.data[name]; };
+        return "";
+    }
+    function get_str(name: String) -> String { return str(me.get(name)); }
+    function get_int(name: String) -> int { return int(me.get(name)); }
+    function get_float(name: String) -> float { return float(me.get(name)); }
+    function get_bool(name: String) -> bool { return int(me.get(name)) != 0; }
+
+    function set(name: String, value: String) {
+        me.data[name] = value;
+    }
+
+    function fill(values: Record<String, String>) {
+        var keys: String[] = values.keys();
+        for each k in (keys) { me.data[k] = values[k]; };
+    }
+
+    function to_record() -> Record<String, String> {
+        return me.data;
+    }
+
+    function save() -> int {
+        var pk = me.get(me.primary_key);
+        if (!me.exists) {
+            var id = insert_values(me.orm, me.table, me.data);
+            if (!me.data.has(me.primary_key)) {
+                me.data[me.primary_key] = id.toString();
+            };
+            me.exists = true;
+            return id;
+        };
+        var values: Record<String, String> = {};
+        var keys: String[] = me.data.keys();
+        for each k in (keys) {
+            if (k != me.primary_key) {
+                values[k] = me.data[k];
+            };
+        };
+        return update_values(me.orm, me.table, me.primary_key, pk, values);
+    }
+
+    function delete() -> int {
+        if (!me.exists) { return 0; };
+        return delete_id(me.orm, me.table, me.primary_key, me.get(me.primary_key));
+    }
+};
+
+export class Query {
+    public var orm: orm::Orm;
+    public var table: String;
+    public var primary_key: String;
+    public var wheres: String[];
+    public var params: orm::Cell[];
+    public var order_sql: String;
+    public var limit_n: int;
+    public var offset_n: int;
+
+    function main(o: orm::Orm, table: String, primary_key: String) {
+        me.orm = o;
+        me.table = table;
+        me.primary_key = primary_key;
+        me.wheres = [];
+        me.params = [];
+        me.order_sql = "";
+        me.limit_n = -1;
+        me.offset_n = 0;
+    }
+
+    function where(column: String, operator: String, value: String) -> Query {
+        require_ident(column, "columna");
+        var op = operator.lower();
+        if (!(op == "=" || op == "!=" || op == "<>" || op == ">" || op == ">=" ||
+              op == "<" || op == "<=" || op == "like")) {
+            throw("Model: operador no permitido: " + operator);
+        };
+        me.wheres.push(column + " " + op + " ?");
+        me.params.push(value_cell(value));
+        return me;
+    }
+
+    function where_eq(column: String, value: String) -> Query {
+        return me.where(column, "=", value);
+    }
+    function where_like(column: String, value: String) -> Query {
+        return me.where(column, "like", value);
+    }
+
+    function where_in(column: String, values: String[]) -> Query {
+        require_ident(column, "columna");
+        if (values.length == 0) { return me.where(column, "=", ""); };
+        var marks = "";
+        for each value and i in (values) {
+            if (i > 0) { marks = marks + ", "; };
+            marks = marks + "?";
+            me.params.push(orm::cText(value));
+        };
+        me.wheres.push(column + " IN (" + marks + ")");
+        return me;
+    }
+
+    function where_null(column: String) -> Query {
+        require_ident(column, "columna");
+        me.wheres.push(column + " IS NULL");
+        return me;
+    }
+
+    function where_not_null(column: String) -> Query {
+        require_ident(column, "columna");
+        me.wheres.push(column + " IS NOT NULL");
+        return me;
+    }
+
+    function where_between(column: String, start: String, end: String) -> Query {
+        require_ident(column, "columna");
+        me.wheres.push(column + " BETWEEN ? AND ?");
+        me.params.push(value_cell(start));
+        me.params.push(value_cell(end));
+        return me;
+    }
+
+    function order_by(column: String, direction: String) -> Query {
+        require_ident(column, "columna");
+        var dir = direction.lower();
+        if (dir != "asc" && dir != "desc") {
+            throw("Model: dirección inválida: " + direction);
+        };
+        me.order_sql = column + " " + dir;
+        return me;
+    }
+
+    function latest(column: String) -> Query { return me.order_by(column, "desc"); }
+    function oldest(column: String) -> Query { return me.order_by(column, "asc"); }
+    function limit(n: int) -> Query { me.limit_n = n; return me; }
+    function offset(n: int) -> Query { me.offset_n = n; return me; }
+    function take(n: int) -> Query { return me.limit(n); }
+    function skip(n: int) -> Query { return me.offset(n); }
+
+    function where_sql() -> String {
+        if (me.wheres.length == 0) { return "1 = 1"; };
+        var out = "";
+        for each w and i in (me.wheres) {
+            if (i > 0) { out = out + " AND "; };
+            out = out + w;
+        };
+        return out;
+    }
+
+    function select() -> orm::ResultSet {
+        return me.orm.selectWhere(
+            me.table, me.where_sql(), me.params, me.order_sql,
+            me.limit_n, me.offset_n
+        );
+    }
+
+    function get() -> ModelRow[] {
+        var rs = me.select();
+        var rows: ModelRow[] = [];
+        for (var r = 0; r < rs.nrows; r++) {
+            var data: Record<String, String> = {};
+            for each col and c in (rs.cols) {
+                data[col] = cell_value(rs.at(r, c));
+            };
+            rows.push(ModelRow(me.orm, me.table, me.primary_key, data, true));
+        };
+        return rows;
+    }
+
+    function first() -> ModelRow {
+        me.limit_n = 1;
+        var rows = me.get();
+        if (rows.length == 0) {
+            return ModelRow(me.orm, me.table, me.primary_key, {}, false);
+        };
+        return rows[0];
+    }
+
+    function count() -> int {
+        return me.orm.countWhere(me.table, me.where_sql(), me.params);
+    }
+
+    function exists() -> bool { return me.count() > 0; }
+
+    function pluck(column: String) -> String[] {
+        require_ident(column, "columna");
+        var sql = "SELECT " + column + " FROM " + me.table +
+                  " WHERE " + me.where_sql();
+        if (me.order_sql != "") {
+            sql = sql + " ORDER BY " + me.order_sql;
+        };
+        var rs = me.orm.queryBind(sql, me.params);
+        var out: String[] = [];
+        for (var r = 0; r < rs.nrows; r++) {
+            out.push(str(cell_value(rs.at(r, 0))));
+        };
+        return out;
+    }
+
+    function value(column: String) -> String {
+        var values = me.pluck(column);
+        if (values.length == 0) { return ""; };
+        return values[0];
+    }
+
+    function aggregate(fn: String, column: String) -> float {
+        require_ident(column, "columna");
+        var sql = "SELECT " + fn + "(" + column + ") FROM " + me.table +
+                  " WHERE " + me.where_sql();
+        var rs = me.orm.queryBind(sql, me.params);
+        if (rs.nrows == 0) { return 0.0; };
+        var c = rs.at(0, 0);
+        if (c.kind == orm::KIND_NULL) { return 0.0; };
+        if (c.kind == orm::KIND_INT) { return float(c.i); };
+        if (c.kind == orm::KIND_FLOAT) { return c.f; };
+        return float(c.s);
+    }
+
+    function sum(column: String) -> float { return me.aggregate("SUM", column); }
+    function max(column: String) -> float { return me.aggregate("MAX", column); }
+    function min(column: String) -> float { return me.aggregate("MIN", column); }
+    function avg(column: String) -> float { return me.aggregate("AVG", column); }
+
+    function update(values: Record<String, String>) -> int {
+        if (me.wheres.length == 0) {
+            throw("Model: update sin WHERE (usá truncate/delete explícito)");
+        };
+        var cols: String[] = [];
+        var cells: orm::Cell[] = [];
+        var keys: String[] = values.keys();
+        for each k in (keys) {
+            require_ident(k, "columna");
+            cols.push(k);
+            cells.push(value_cell(values[k]));
+        };
+        if (cols.length == 0) { return 0; };
+        return me.orm.update(me.table, cols, cells, me.where_sql(), me.params);
+    }
+
+    function delete() -> int {
+        if (me.wheres.length == 0) {
+            throw("Model: delete sin WHERE");
+        };
+        return me.orm.deleteWhere(me.table, me.where_sql(), me.params);
+    }
+};
+
+export class Paginator {
+    public var data: ModelRow[];
+    public var total: int;
+    public var page: int;
+    public var per_page: int;
+    public var last_page: int;
+
+    function main(data: ModelRow[], total: int, page: int, per_page: int, last_page: int) {
+        me.data = data;
+        me.total = total;
+        me.page = page;
+        me.per_page = per_page;
+        me.last_page = last_page;
+    }
+
+    function page_from() -> int {
+        if (me.total == 0) { return 0; };
+        return (me.page - 1) * me.per_page + 1;
+    }
+    function page_to() -> int {
+        var n = me.page * me.per_page;
+        if (n > me.total) { return me.total; };
+        return n;
+    }
+    function has_more() -> bool { return me.page < me.last_page; }
+};
+
+export class Model {
+    public var orm: orm::Orm;
+    public var table: String;
+    public var primary_key: String;
+
+    function main(o: orm::Orm, table: String, primary_key: String) {
+        require_ident(table, "tabla");
+        require_ident(primary_key, "primary key");
+        me.orm = o;
+        me.table = table;
+        me.primary_key = primary_key;
+    }
+
+    function query() -> Query { return Query(me.orm, me.table, me.primary_key); }
+    function where(column: String, operator: String, value: String) -> Query {
+        return me.query().where(column, operator, value);
+    }
+
+    function all() -> ModelRow[] { return me.query().get(); }
+    function all_ordered(column: String, direction: String) -> ModelRow[] {
+        return me.query().order_by(column, direction).get();
+    }
+    function first() -> ModelRow { return me.query().first(); }
+    function first_or_fail() -> ModelRow {
+        var row = me.first();
+        if (!row.exists) { throw("Model: " + me.table + " vacío"); };
+        return row;
+    }
+
+    function find(id: String) -> ModelRow {
+        return me.query().where(me.primary_key, "=", id).first();
+    }
+    function find_or_fail(id: String) -> ModelRow {
+        var row = me.find(id);
+        if (!row.exists) {
+            throw("Model: " + me.table + " no tiene " + me.primary_key + "=" + str(id));
+        };
+        return row;
+    }
+    function find_many(ids: String[]) -> ModelRow[] {
+        return me.query().where_in(me.primary_key, ids).get();
+    }
+
+    function first_where(column: String, value: String) -> ModelRow {
+        return me.query().where(column, "=", value).first();
+    }
+
+    function insert(values: Record<String, String>) -> int {
+        return insert_values(me.orm, me.table, values);
+    }
+
+    function create(values: Record<String, String>) -> ModelRow {
+        var id = insert_values(me.orm, me.table, values);
+        if (!values.has(me.primary_key)) {
+            values[me.primary_key] = id.toString();
+        };
+        var row = me.find(values[me.primary_key]);
+        if (!row.exists) {
+            return ModelRow(me.orm, me.table, me.primary_key, values, true);
+        };
+        return row;
+    }
+
+    function update(id: String, values: Record<String, String>) -> int {
+        return me.query().where(me.primary_key, "=", id).update(values);
+    }
+
+    function delete(id: String) -> int {
+        return me.query().where(me.primary_key, "=", id).delete();
+    }
+
+    function destroy(ids: String[]) -> int {
+        var n = 0;
+        for each id in (ids) { n = n + me.delete(id); };
+        return n;
+    }
+
+    function count() -> int { return me.query().count(); }
+    function exists(id: String) -> bool {
+        return me.query().where(me.primary_key, "=", id).exists();
+    }
+    function doesnt_exist(id: String) -> bool { return !me.exists(id); }
+
+    function pluck(column: String) -> String[] { return me.query().pluck(column); }
+    function value(column: String) -> String { return me.query().value(column); }
+    function max(column: String) -> float { return me.query().max(column); }
+    function min(column: String) -> float { return me.query().min(column); }
+    function avg(column: String) -> float { return me.query().avg(column); }
+    function sum(column: String) -> float { return me.query().sum(column); }
+
+    function first_or_create(attrs: Record<String, String>, values: Record<String, String>) -> ModelRow {
+        var q = me.query();
+        var keys: String[] = attrs.keys();
+        for each k in (keys) { q = q.where(k, "=", attrs[k]); };
+        var row = q.first();
+        if (row.exists) { return row; };
+        return me.create(merge_records(attrs, values));
+    }
+
+    function update_or_create(attrs: Record<String, String>, values: Record<String, String>) -> ModelRow {
+        var q = me.query();
+        var keys: String[] = attrs.keys();
+        for each k in (keys) { q = q.where(k, "=", attrs[k]); };
+        var row = q.first();
+        if (row.exists) {
+            me.update(row.get(me.primary_key), values);
+            return me.find(row.get(me.primary_key));
+        };
+        return me.create(merge_records(attrs, values));
+    }
+
+    function increment(id: String, column: String, amount: int) -> int {
+        require_ident(column, "columna");
+        var sql = "UPDATE " + me.table + " SET " + column + " = " + column +
+                  " + ? WHERE " + me.primary_key + " = ?";
+        var cells: orm::Cell[] = [orm::cInt(amount), value_cell(id)];
+        return me.orm.runDml(sql, cells);
+    }
+
+    function decrement(id: String, column: String, amount: int) -> int {
+        return me.increment(id, column, 0 - amount);
+    }
+
+    function truncate() -> int {
+        return me.orm.deleteWhere(me.table, "1 = 1", []);
+    }
+
+    function paginate(page: int, per_page: int) -> Paginator {
+        var p = page;
+        if (p < 1) { p = 1; };
+        var pp = per_page;
+        if (pp < 1) { pp = 15; };
+        var total = me.count();
+        var last: int = int((total + pp - 1) / pp);
+        var rows = me.query().offset((p - 1) * pp).limit(pp).get();
+        return Paginator(rows, total, p, pp, last);
+    }
+};

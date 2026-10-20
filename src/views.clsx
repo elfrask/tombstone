@@ -1,101 +1,142 @@
-# src/views.clsx - Vistas CMX del proyecto demo (no del motor).
+# src/views.clsx - Páginas del proyecto demo (composición de componentes CMX).
 #
-# El entry las importa por ruta relativa (`from "./views" import ...`). Los
-# helpers internos no se exportan; solo `nav` y `home_view` son API pública.
-#
-# Los iconos viven en `modules/tombstone-icons` y se insertan por interpolación
-# CMX: `{icon("route")}`. Los componentes uppercase (`<Card />`) también están
-# soportados por el renderer, pero deben devolver String; los iconos devuelven
-# Cmx, por eso se interpolan.
+# El motor vive en modules/tombstone; acá solo se arma la presentación.
+# Los props tipados se convierten a `Record<String, Value>` antes del spread:
+# el contrato de CMX exige ese layout para fusionar props en un tag.
+from "tombstone" import AnchorProps, ButtonProps;
+from "tombstone" import NavBarProps, HeroBannerProps, TerminalPanelProps, SiteFooterProps;
+from "tombstone" import ChipProps, UiCardProps;
+from "./components" import NavBar, HeroBanner, TerminalPanel, SiteFooter;
+from "./components" import Button, Link, Chip, UiCard;
 
-from "tombstone" import raw;
-from "tombstone-icons" import icon;
-
-
-# -------------------------------------------------------------- helpers ---
-
-function chip(ico_name: String, label: String) -> Cmx {
-    return (
-        <li>{icon(ico_name)}<span>{label}</span></li>
-    );
+export interface LandingPageProps {
+    id: String,
 };
 
-
-# ------------------------------------------------------------------ nav ---
-
-export function nav() -> Cmx {
-    return (
-        <header class="nav">
-            <div class="nav__inner">
-                <a class="brand" href="#top" aria-label="Tombstone, inicio">
-                    <span class="brand__mark">{icon("logo")}</span>
-                    <span class="brand__name">tombstone</span>
-                    <span class="brand__badge">v1.0</span>
-                </a>
-                <span class="nav__spacer"></span>
-                <a class="btn btn--primary btn--sm" href="#code">Comenzar</a>
-            </div>
-        </header>
-    );
+export interface GalleryPageProps {
+    id: String,
 };
 
+const TERM_HTML = "<span class=\"t-m\"># src/main.clsx</span>\n"
+    + "<span class=\"t-k\">app.get</span>(<span class=\"t-s\">\"/users/{id}\"</span>, (req: Request) -> Response {\n"
+    + "    <span class=\"t-k\">return</span> Response.<span class=\"t-f\">json</span>({ <span class=\"t-s\">\"id\"</span>: req.params[<span class=\"t-s\">\"id\"</span>] });\n"
+    + "});\n"
+    + "\n"
+    + "<span class=\"t-p\">$</span> clx run src/main.clsx -- 8080\n"
+    + "<span class=\"t-c\">Servidor en http://localhost:8080</span><span class=\"t-cur\"></span>";
 
-# --------------------------------------------------------------- pagina ---
+export function Landing(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    var nav: NavBarProps = {
+        id: "",
+        className: "nav",
+        brand: "tombstone",
+        badge: "v1.0",
+        ctaHref: "#code",
+        ctaLabel: "Comenzar"
+    };
+    var navProps: Record<String, Value> = nav;
 
-export function home_view(header: Cmx) -> Cmx {
-    var term = "<span class=\"t-m\"># src/main.clsx</span>\n"
-        + "<span class=\"t-k\">app.get</span>(<span class=\"t-s\">\"/users/{id}\"</span>, (req: Request) -> Response {\n"
-        + "    <span class=\"t-k\">return</span> Response.<span class=\"t-f\">json</span>({ <span class=\"t-s\">\"id\"</span>: req.params[<span class=\"t-s\">\"id\"</span>] });\n"
-        + "});\n"
-        + "\n"
-        + "<span class=\"t-p\">$</span> clx run src/main.clsx -- 8080\n"
-        + "<span class=\"t-c\">Servidor en http://localhost:8080</span><span class=\"t-cur\"></span>";
+    var hero: HeroBannerProps = {
+        id: "",
+        className: "hero",
+        kicker: "100% CLS puro · sin dependencias",
+        title: "Tombstone",
+        lead: "Framework HTTP en CLS. Rutas, no boilerplate.",
+        primaryHref: "#code",
+        primaryLabel: "Comenzar",
+        secondaryHref: "/api/health",
+        secondaryLabel: "API en vivo"
+    };
+    var heroProps: Record<String, Value> = hero;
+
+    var terminal: TerminalPanelProps = {
+        id: "code",
+        className: "terminal",
+        title: "src/main.clsx",
+        code: TERM_HTML
+    };
+    var terminalProps: Record<String, Value> = terminal;
+
+    var footer: SiteFooterProps = {
+        id: "",
+        className: "footer",
+        brand: "Tombstone"
+    };
+    var footerProps: Record<String, Value> = footer;
 
     return (
-        <div class="page" id="top">
-            {header}
+        <div id={str(props.id)} class="page">
+            <NavBar {...navProps} />
             <main class="main">
-                <section class="hero">
-                    <div class="hero__glow"></div>
-                    <div class="wrap hero__grid">
-                        <div class="hero__copy">
-                            <span class="kicker">100% CLS puro · sin dependencias</span>
-                            <h1 class="hero__title">Tombstone<span class="caret" aria-hidden="true"></span></h1>
-                            <p class="hero__lead">Framework HTTP en CLS. Rutas, no boilerplate.</p>
-                            <div class="hero__cta">
-                                <a class="btn btn--primary" href="#code">Comenzar</a>
-                                <a class="btn btn--ghost" href="/api/health">API en vivo</a>
-                            </div>
-                            <ul class="chips">
-                                {chip("route", "Router")}
-                                {chip("layers", "Middleware")}
-                                {chip("code", "CMX")}
-                                {chip("socket", "Sockets")}
-                                {chip("globe", "CORS")}
-                                {chip("cookie", "Cookies")}
-                            </ul>
-                        </div>
-
-                        <div class="terminal" id="code" role="img" aria-label="Una ruta de ejemplo">
-                            <div class="terminal__bar">
-                                <em>src/main.clsx</em>
-                                <span class="term__live"><i></i>live</span>
-                            </div>
-                            <pre class="terminal__body">{raw(term)}</pre>
-                        </div>
-                    </div>
-                </section>
+                <HeroBanner {...heroProps}>
+                    <TerminalPanel {...terminalProps} />
+                </HeroBanner>
             </main>
-
-            <footer class="footer">
-                <div class="wrap footer__inner">
-                    <span class="footer__brand">{icon("logo")} Tombstone</span>
-                    <span class="status" data-status="checking">
-                        <span class="status__dot"></span>
-                        <span data-status-text="1">comprobando servidor…</span>
-                    </span>
-                </div>
-            </footer>
+            <SiteFooter {...footerProps} />
         </div>
+    );
+};
+
+export function Gallery(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    var primary: ButtonProps = {
+        id: "",
+        className: "btn btn--primary",
+        type: "button",
+        disabled: false
+    };
+    var primaryProps: Record<String, Value> = primary;
+
+    var secondary: ButtonProps = {
+        id: "",
+        className: "btn btn--ghost",
+        type: "button",
+        disabled: true
+    };
+    var secondaryProps: Record<String, Value> = secondary;
+
+    var docs: AnchorProps = {
+        id: "",
+        className: "btn btn--ghost",
+        href: "#docs",
+        target: "_self",
+        rel: ""
+    };
+    var docsProps: Record<String, Value> = docs;
+
+    var chip: ChipProps = {
+        id: "",
+        className: "",
+        value: "",
+        label: "CMX",
+        icon: "code"
+    };
+    var chipProps: Record<String, Value> = chip;
+
+    var card: UiCardProps = {
+        id: "",
+        className: "card",
+        title: "Componentes CMX",
+        body: "Props tipados con interfaces y spreads."
+    };
+    var cardProps: Record<String, Value> = card;
+
+    return (
+        <main id={str(props.id)} class="main gallery">
+            <div class="wrap">
+                <h1>UI Kit</h1>
+                <p>Componentes como funciones que devuelven Cmx.</p>
+                <div class="hero__cta">
+                    <Button {...primaryProps}>Comenzar</Button>
+                    <Button {...secondaryProps}>Deshabilitado</Button>
+                    <Link {...docsProps}>Documentación</Link>
+                </div>
+                <ul class="chips">
+                    <Chip {...chipProps} />
+                </ul>
+                <UiCard {...cardProps}>
+                    <span class="kicker">slot de children</span>
+                </UiCard>
+            </div>
+        </main>
     );
 };

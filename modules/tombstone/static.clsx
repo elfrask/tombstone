@@ -1,8 +1,8 @@
-# tombstone/static.clsx - Archivos estáticos (CLS + `modules/io` FFI).
+# tombstone/static.clsx - Archivos estáticos (fs del nodo desktop).
 #
-# `io` es el módulo global de I/O (FFI a C, sin `host_call fs`). El shim
-# `io_shim.dll` se resuelve relativo al CWD: ejecutar desde la raíz del repo CLS.
-import "io" as io;
+# `fs` es el módulo desktop del nodo (lectura de archivos). Ejecutar desde la
+# raíz del repo CLS (los shims/FS del nodo resuelven rutas relativas al CWD).
+import "fs" as fs;
 
 from "httpd" import Request, Response;
 
@@ -65,11 +65,11 @@ export class StaticHandler {
         };
 
         var file = me.directory + "/" + rel;
-        if (io::exists(file) == 0) {
+        if (fs.exists(file) == 0) {
             return Response.not_found();
         };
 
-        var res = Response(200, io::readText(file));
+        var res = Response(200, fs.readFile(file));
         res.headers["content-type"] = content_type_for(file);
         return res;
     }

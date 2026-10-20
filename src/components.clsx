@@ -1,0 +1,173 @@
+# src/components.clsx - Componentes CMX del proyecto demo (funciones CLS que
+# devuelven Cmx). Se usan como tags `<Componente ... />`; el renderer los
+# invoca vía `tagCallable`.
+#
+# Los props se tipan con interfaces; antes del spread se convierten a
+# `Record<String, Value>` (layout que exige CMX para fusionar props):
+#   var p: AnchorProps = { ... };
+#   var r: Record<String, Value> = p;
+#   <Link {...r}>Texto</Link>
+from "tombstone" import AnchorProps, ButtonProps, ChipProps;
+from "tombstone" import raw, renderChildren;
+from "tombstone-icons" import icon;
+
+# ---------------------------------------------------------------- atómicos ---
+
+export function Link(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    return (
+        <a id={str(props.id)} class={str(props.className)} href={str(props.href)}
+           target={str(props.target)} rel={str(props.rel)}>
+            {raw(renderChildren(children))}
+        </a>
+    );
+};
+
+export function Button(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    return (
+        <button id={str(props.id)} class={str(props.className)} type={str(props.type)}
+                disabled={props.disabled == true}>
+            {raw(renderChildren(children))}
+        </button>
+    );
+};
+
+export function Chip(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    return (
+        <li id={str(props.id)} class={str(props.className)}>
+            {icon(str(props.icon))}
+            <span>{str(props.label)}</span>
+        </li>
+    );
+};
+
+export function UiCard(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    return (
+        <div id={str(props.id)} class={str(props.className)}>
+            <h3>{str(props.title)}</h3>
+            <p>{str(props.body)}</p>
+            {raw(renderChildren(children))}
+        </div>
+    );
+};
+
+# ------------------------------------------------------------- compuestos ---
+
+export function NavBar(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    var brandLink: AnchorProps = {
+        id: "",
+        className: "brand",
+        href: "#top",
+        target: "_self",
+        rel: ""
+    };
+    var brandProps: Record<String, Value> = brandLink;
+
+    var ctaLink: AnchorProps = {
+        id: "",
+        className: "btn btn--primary btn--sm",
+        href: str(props.ctaHref),
+        target: "_self",
+        rel: ""
+    };
+    var ctaProps: Record<String, Value> = ctaLink;
+
+    return (
+        <div id={str(props.id)} class={str(props.className)}>
+            <div class="nav__inner">
+                <Link {...brandProps}>
+                    <span class="brand__mark">{icon("logo")}</span>
+                    <span class="brand__name">{str(props.brand)}</span>
+                    <span class="brand__badge">{str(props.badge)}</span>
+                </Link>
+                <span class="nav__spacer"></span>
+                <Link {...ctaProps}>{str(props.ctaLabel)}</Link>
+            </div>
+        </div>
+    );
+};
+
+export function HeroBanner(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    var primary: AnchorProps = {
+        id: "",
+        className: "btn btn--primary",
+        href: str(props.primaryHref),
+        target: "_self",
+        rel: ""
+    };
+    var primaryProps: Record<String, Value> = primary;
+
+    var secondary: AnchorProps = {
+        id: "",
+        className: "btn btn--ghost",
+        href: str(props.secondaryHref),
+        target: "_self",
+        rel: ""
+    };
+    var secondaryProps: Record<String, Value> = secondary;
+
+    var chipRouter: ChipProps = { id: "", className: "", value: "", label: "Router", icon: "route" };
+    var chipMiddleware: ChipProps = { id: "", className: "", value: "", label: "Middleware", icon: "layers" };
+    var chipCmx: ChipProps = { id: "", className: "", value: "", label: "CMX", icon: "code" };
+    var chipSockets: ChipProps = { id: "", className: "", value: "", label: "Sockets", icon: "socket" };
+    var chipCors: ChipProps = { id: "", className: "", value: "", label: "CORS", icon: "globe" };
+    var chipCookies: ChipProps = { id: "", className: "", value: "", label: "Cookies", icon: "cookie" };
+
+    var chipRouterProps: Record<String, Value> = chipRouter;
+    var chipMiddlewareProps: Record<String, Value> = chipMiddleware;
+    var chipCmxProps: Record<String, Value> = chipCmx;
+    var chipSocketsProps: Record<String, Value> = chipSockets;
+    var chipCorsProps: Record<String, Value> = chipCors;
+    var chipCookiesProps: Record<String, Value> = chipCookies;
+
+    return (
+        <div id={str(props.id)} class={str(props.className)}>
+            <div class="hero__glow"></div>
+            <div class="wrap hero__grid">
+                <div class="hero__copy">
+                    <span class="kicker">{str(props.kicker)}</span>
+                    <h1 class="hero__title">{str(props.title)}<span class="caret" aria-hidden="true"></span></h1>
+                    <p class="hero__lead">{str(props.lead)}</p>
+                    <div class="hero__cta">
+                        <Link {...primaryProps}>{str(props.primaryLabel)}</Link>
+                        <Link {...secondaryProps}>{str(props.secondaryLabel)}</Link>
+                    </div>
+                    <ul class="chips">
+                        <Chip {...chipRouterProps} />
+                        <Chip {...chipMiddlewareProps} />
+                        <Chip {...chipCmxProps} />
+                        <Chip {...chipSocketsProps} />
+                        <Chip {...chipCorsProps} />
+                        <Chip {...chipCookiesProps} />
+                    </ul>
+                </div>
+                {raw(renderChildren(children))}
+            </div>
+        </div>
+    );
+};
+
+export function TerminalPanel(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    return (
+        <div id={str(props.id)} class={str(props.className)} role="img" aria-label="Una ruta de ejemplo">
+            <div class="terminal__bar">
+                <em>{str(props.title)}</em>
+                <span class="term__live"><i></i>live</span>
+            </div>
+            <pre class="terminal__body">{raw(str(props.code))}</pre>
+        </div>
+    );
+};
+
+export function SiteFooter(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    return (
+        <div id={str(props.id)} class={str(props.className)}>
+            <div class="wrap footer__inner">
+                <span class="footer__brand">{icon("logo")} {str(props.brand)}</span>
+                <span class="status" data-status="checking">
+                    <span class="status__dot"></span>
+                    <span data-status-text="1">comprobando servidor…</span>
+                </span>
+            </div>
+        </div>
+    );
+};

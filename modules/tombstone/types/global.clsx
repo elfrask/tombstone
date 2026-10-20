@@ -1,0 +1,34 @@
+# types/global.clsx - Atributos globales y tipos base de CMX.
+#
+# Los nombres siguen el estilo de props de componente (className, htmlFor,
+# tabIndex, ...). El componente que renderiza la etiqueta es quien traduce
+# `className` -> `class`, etc. Los campos son REQUERIDOS por el typeck: para
+# props opcionales, definí una interface con los campos que uses y extendé con
+# `interface MiProps extends TagProps { ... }`.
+export interface ElementProps {
+    id: String,
+    className: String,
+};
+
+export interface GlobalProps extends ElementProps {
+    style: String,
+    title: String,
+    hidden: Bool,
+    role: String,
+    tabIndex: Int,
+    lang: String,
+    dir: String,
+    draggable: Bool,
+    spellCheck: Bool,
+    contentEditable: Bool,
+    accessKey: String,
+    ariaLabel: String,
+    ariaHidden: Bool,
+    ariaExpanded: Bool,
+    ariaControls: String,
+    ariaDescribedBy: String,
+    ariaLive: String,
+    ariaCurrent: String,
+};
+
+export alias ChildList = Cmx[];

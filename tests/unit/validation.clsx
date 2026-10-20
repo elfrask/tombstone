@@ -1,0 +1,57 @@
+from "tombstone" import Request, field, schema;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var form = Request.parse(
+        "POST /x HTTP/1.1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n" +
+        "name=Ana+Maria&email=ana%40example.com&password=secret123&password_confirmation=secret123"
+    );
+    check::assertEqStr("val.form.name", form.input("name"), "Ana Maria");
+    check::assertEqStr("val.form.email", form.input("email"), "ana@example.com");
+
+    var v = form.validate({
+        name: "required|string|min:3|max:40",
+        email: "required|email",
+        password: "required|min:8|confirmed"
+    });
+    check::assertTrue("val.form.ok", v.ok());
+    check::assertEqStr("val.form.data.email", v.data["email"], "ana@example.com");
+
+    var bad = form.validate({name: "required|int", email: "required|email"});
+    check::assertTrue("val.form.invalid", bad.failed());
+    check::assertTrue("val.form.error.name", bad.first("name").contains("entero"));
+
+    var jsonReq = Request.parse(
+        "POST /x HTTP/1.1\r\nContent-Type: application/json\r\n\r\n" +
+        "{\"name\":\"Ana\",\"email\":\"ana@example.com\"}"
+    );
+    var jv = jsonReq.validate({name: "required|min:2", email: "required|email"});
+    check::assertTrue("val.json.ok", jv.ok());
+    check::assertEqStr("val.json.name", jv.data["name"], "Ana");
+    var jbad = jsonReq.validate({name: "required|int"});
+    check::assertTrue("val.json.invalid", jbad.failed());
+
+    var s = schema({name: field().required().string().min(2).to_rule()});
+    var sv = form.validate_schema(s);
+    check::assertTrue("val.schema.ok", sv.ok());
+
+    var boundary = "----X";
+    var body = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nHola\r\n" +
+               "--" + boundary + "\r\nContent-Disposition: form-data; name=\"doc\"; filename=\"a.txt\"\r\n" +
+               "Content-Type: text/plain\r\n\r\ncontenido\r\n--" + boundary + "--\r\n";
+    var mp = Request.parse(
+        "POST /x HTTP/1.1\r\nContent-Type: multipart/form-data; boundary=" + boundary +
+        "\r\nContent-Length: " + body.length.toString() + "\r\n\r\n" + body
+    );
+    check::assertEqStr("val.multipart.field", mp.input("title"), "Hola");
+    check::assertTrue("val.multipart.file", mp.has_file("doc"));
+    check::assertEqStr("val.multipart.filename", mp.file("doc").filename, "a.txt");
+    check::assertEqStr("val.multipart.content", mp.file("doc").content, "contenido");
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+};

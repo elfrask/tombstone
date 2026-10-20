@@ -1,0 +1,43 @@
+# types/ui.clsx - Props de componentes de UI (no etiquetas HTML raw).
+#
+# Viven en el módulo `tombstone` para que los call-sites usen interfaces
+# importadas (mismo camino que ButtonProps/AnchorProps) y las puedan extender.
+from "./types/global" import ElementProps;
+from "./types/lists" import LiProps;
+
+export interface NavBarProps extends ElementProps {
+    brand: String,
+    badge: String,
+    ctaHref: String,
+    ctaLabel: String,
+};
+
+export interface HeroBannerProps extends ElementProps {
+    kicker: String,
+    title: String,
+    lead: String,
+    primaryHref: String,
+    primaryLabel: String,
+    secondaryHref: String,
+    secondaryLabel: String,
+};
+
+export interface TerminalPanelProps extends ElementProps {
+    title: String,
+    code: String,
+};
+
+export interface SiteFooterProps extends ElementProps {
+    brand: String,
+};
+
+export interface UiCardProps extends ElementProps {
+    title: String,
+    body: String,
+};
+
+# Extensión de la interface de la etiqueta <li>.
+export interface ChipProps extends LiProps {
+    label: String,
+    icon: String,
+};

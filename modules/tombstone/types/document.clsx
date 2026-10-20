@@ -1,0 +1,65 @@
+# types/document.clsx - Etiquetas del documento HTML.
+
+from "./types/global" import ElementProps;
+
+export interface HtmlProps extends ElementProps {
+    lang: String,
+    dir: String,
+    xmlns: String,
+};
+
+export interface HeadProps extends ElementProps {
+};
+
+export interface BodyProps extends ElementProps {
+    style: String,
+};
+
+export interface TitleProps extends ElementProps {
+};
+
+export interface MetaProps extends ElementProps {
+    name: String,
+    content: String,
+    property: String,
+    charset: String,
+    httpEquiv: String,
+};
+
+export interface LinkProps extends ElementProps {
+    href: String,
+    rel: String,
+    type: String,
+    media: String,
+    hrefLang: String,
+    sizes: String,
+    crossOrigin: String,
+    referrerPolicy: String,
+    asType: String,
+    integrity: String,
+};
+
+export interface StyleProps extends ElementProps {
+    media: String,
+    type: String,
+    nonce: String,
+};
+
+export interface ScriptProps extends ElementProps {
+    src: String,
+    type: String,
+    defer: Bool,
+    asyncScript: Bool,
+    integrity: String,
+    crossOrigin: String,
+    referrerPolicy: String,
+    nonce: String,
+};
+
+export interface BaseProps extends ElementProps {
+    href: String,
+    target: String,
+};
+
+export interface NoscriptProps extends ElementProps {
+};

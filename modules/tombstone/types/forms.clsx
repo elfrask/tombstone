@@ -1,0 +1,128 @@
+# types/forms.clsx - Formularios y controles.
+
+from "./types/global" import ElementProps;
+
+export interface FormProps extends ElementProps {
+    action: String,
+    formMethod: String,
+    encType: String,
+    target: String,
+    noValidate: Bool,
+    autoComplete: String,
+    name: String,
+};
+
+export interface InputProps extends ElementProps {
+    type: String,
+    name: String,
+    value: String,
+    placeholder: String,
+    required: Bool,
+    disabled: Bool,
+    readOnly: Bool,
+    checked: Bool,
+    min: String,
+    max: String,
+    step: String,
+    pattern: String,
+    autoComplete: String,
+    accept: String,
+    multiple: Bool,
+    minLength: Int,
+    maxLength: Int,
+    size: Int,
+    src: String,
+    alt: String,
+    form: String,
+    list: String,
+    autoFocus: Bool,
+};
+
+export interface ButtonProps extends ElementProps {
+    type: String,
+    disabled: Bool,
+};
+
+# Atributos adicionales de <button> (extensión opcional).
+export interface ButtonExtraAttrs {
+    name: String,
+    value: String,
+    form: String,
+    autoFocus: Bool,
+};
+
+export interface ButtonFullProps extends ButtonProps, ButtonExtraAttrs {
+};
+
+export interface TextareaProps extends ElementProps {
+    name: String,
+    value: String,
+    rows: Int,
+    cols: Int,
+    placeholder: String,
+    required: Bool,
+    disabled: Bool,
+    readOnly: Bool,
+    maxLength: Int,
+    minLength: Int,
+    wrap: String,
+};
+
+export interface SelectProps extends ElementProps {
+    name: String,
+    multiple: Bool,
+    size: Int,
+    required: Bool,
+    disabled: Bool,
+    autoComplete: String,
+    form: String,
+};
+
+export interface OptionProps extends ElementProps {
+    value: String,
+    label: String,
+    selected: Bool,
+    disabled: Bool,
+};
+
+export interface OptgroupProps extends ElementProps {
+    label: String,
+    disabled: Bool,
+};
+
+export interface LabelProps extends ElementProps {
+    htmlFor: String,
+    form: String,
+};
+
+export interface FieldsetProps extends ElementProps {
+    disabled: Bool,
+    form: String,
+    name: String,
+};
+
+export interface LegendProps extends ElementProps {
+};
+
+export interface DatalistProps extends ElementProps {
+};
+
+export interface OutputProps extends ElementProps {
+    htmlFor: String,
+    form: String,
+    name: String,
+};
+
+export interface ProgressProps extends ElementProps {
+    value: Float,
+    max: Float,
+};
+
+export interface MeterProps extends ElementProps {
+    value: Float,
+    min: Float,
+    max: Float,
+    low: Float,
+    high: Float,
+    optimum: Float,
+};

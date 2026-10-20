@@ -2,8 +2,12 @@
 #
 # Un consumidor hace `from "tombstone" import App, Request, Response, ...;`
 # (el proyecto lo resuelve desde `modules/tombstone/`).
-from "httpd" import Request, Response, statusReason, isSuccess, isRedirect;
-from "httpd" import parseQuery, contentLength;
+from "httpd" import Request, Response, FormFile, statusReason, isSuccess, isRedirect;
+from "httpd" import parseQuery, urlDecode, contentLength;
+from "httpd" import ValidationResult, Schema, field, schema;
+from "./controller" import Controller;
+from "./model" import Model, ModelRow, Query, Paginator;
+from "./database" import Database;
 
 from "./status" import HttpStatus;
 from "./router" import Router, Route, RouteMatch, route_matches;
@@ -15,12 +19,27 @@ from "./cookies" import CookieOptions, parse_cookies, serialize_cookie;
 from "./json" import json_encode, json_decode, json_parse_safe, json_body;
 from "./json" import json_response, json_response_raw, json_string_array;
 from "./lib" import system_pid, system_uptime_ms, system_env;
-from "./view" import raw, e, render, attrs, isVoid, renderEach, layout, ul_items;
+from "./view" import raw, e, render, renderChildren, attrs, isVoid, renderEach, layout, ul_items;
 from "./template" import MetaTag, Template, render_html;
+from "./types/global" import *;
+from "./types/document" import *;
+from "./types/sections" import *;
+from "./types/text" import *;
+from "./types/lists" import *;
+from "./types/forms" import *;
+from "./types/media" import *;
+from "./types/table" import *;
+from "./types/svg" import *;
+from "./types/misc" import *;
+from "./types/ui" import *;
 
-export { Request, Response, statusReason, isSuccess, isRedirect };
-export { parseQuery, parseQuery as parse_query };
+export { Request, Response, FormFile, statusReason, isSuccess, isRedirect };
+export { parseQuery, parseQuery as parse_query, urlDecode, urlDecode as url_decode };
 export { contentLength, contentLength as content_length };
+export { ValidationResult, Schema, field, schema };
+export { Controller };
+export { Model, ModelRow, Query, Paginator };
+export { Database };
 export { HttpStatus };
 export { Router, Route, RouteMatch, route_matches };
 export { Middleware };
@@ -31,5 +50,50 @@ export { CookieOptions, parse_cookies, serialize_cookie };
 export { json_encode, json_decode, json_parse_safe, json_body };
 export { json_response, json_response_raw, json_string_array };
 export { system_pid, system_uptime_ms, system_env };
-export { raw, e, render, attrs, isVoid, renderEach, layout, ul_items };
+export { raw, e, render, renderChildren, attrs, isVoid, renderEach, layout, ul_items };
 export { MetaTag, Template, render_html };
+
+# Tipos de props CMX (una interface por etiqueta HTML + UI).
+export { ElementProps, GlobalProps, ChildList };
+
+export { HtmlProps, HeadProps, BodyProps, TitleProps, MetaProps, LinkProps,
+         StyleProps, ScriptProps, BaseProps, NoscriptProps };
+
+export { HeaderProps, FooterProps, MainProps, SectionProps, ArticleProps,
+         AsideProps, NavProps, AddressProps, DivProps, SpanProps, HGroupProps,
+         SearchProps };
+
+export { HeadingProps, H1Props, H2Props, H3Props, H4Props, H5Props, H6Props,
+         ParagraphProps, PProps, AnchorProps, AnchorExtraAttrs, AnchorFullProps,
+         BlockquoteProps, PreProps, CodeProps, KbdProps, SampProps, VarProps,
+         EmProps, StrongProps, SmallProps, MarkProps, DelProps, InsProps,
+         SubProps, SupProps, AbbrProps, CiteProps, QProps, TimeProps, DataProps,
+         BdiProps, BdoProps, RubyProps, RtProps, RpProps, BrProps, WbrProps,
+         HrProps };
+
+export { UlProps, OlProps, LiProps, DlProps, DtProps, DdProps };
+
+export { FormProps, InputProps, ButtonProps, ButtonExtraAttrs, ButtonFullProps,
+         TextareaProps, SelectProps, OptionProps, OptgroupProps, LabelProps,
+         FieldsetProps, LegendProps, DatalistProps, OutputProps, ProgressProps,
+         MeterProps };
+
+export { ImgProps, PictureProps, SourceProps, VideoProps, AudioProps,
+         TrackProps, CanvasProps, MapProps, AreaProps, ObjectProps,
+         EmbedProps, IframeProps };
+
+export { TableProps, CaptionProps, ColgroupProps, ColProps, TheadProps,
+         TbodyProps, TfootProps, TrProps, ThProps, TdProps };
+
+export { SvgProps, GProps, PathProps, CircleProps, EllipseProps, RectProps,
+         LineProps, PolylineProps, PolygonProps, SvgTextProps, DefsProps,
+         UseProps, SymbolProps, LinearGradientProps, RadialGradientProps,
+         StopProps, ClipPathProps, MaskProps, PatternProps, MarkerProps,
+         SvgImageProps, SvgAnchorProps, SvgTitleProps, SvgDescProps,
+         ForeignObjectProps };
+
+export { NavBarProps, HeroBannerProps, TerminalPanelProps, SiteFooterProps,
+         UiCardProps, ChipProps };
+
+export { FigureProps, FigcaptionProps, DetailsProps, SummaryProps,
+         DialogProps, MenuProps, TemplateProps, SlotProps };

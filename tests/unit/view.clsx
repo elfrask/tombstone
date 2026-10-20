@@ -1,9 +1,9 @@
-from "tombstone" import render, raw, renderEach, e;
+from "tombstone" import render, raw, renderEach;
 import "check" as check;
 
-# Componente CMX (tag mayúscula): devuelve HTML ya renderizado.
-function Card(props: Record<String, Value>, children: Cmx[]) -> String {
-    return "<article class=\"card\">" + e(str(props.title)) + "</article>";
+# Componente CMX (tag mayúscula): devuelve un subárbol Cmx.
+function Card(props: Record<String, Value>, children: Cmx[]) -> Cmx {
+    return (<article class="card">{str(props.title)}</article>);
 }
 
 function main(args: String[]) -> int {

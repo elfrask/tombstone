@@ -1,0 +1,135 @@
+# types/text.clsx - Texto, encabezados y enlaces.
+
+from "./types/global" import ElementProps;
+
+export interface HeadingProps extends ElementProps {
+};
+
+export interface H1Props extends HeadingProps {
+};
+export interface H2Props extends HeadingProps {
+};
+export interface H3Props extends HeadingProps {
+};
+export interface H4Props extends HeadingProps {
+};
+export interface H5Props extends HeadingProps {
+};
+export interface H6Props extends HeadingProps {
+};
+
+export interface ParagraphProps extends ElementProps {
+};
+
+# Alias corto usado por la etiqueta <p>.
+export interface PProps extends ParagraphProps {
+};
+
+export interface AnchorProps extends ElementProps {
+    href: String,
+    target: String,
+    rel: String,
+};
+
+# Atributos adicionales de <a> (extensión opcional).
+export interface AnchorExtraAttrs {
+    download: String,
+    hrefLang: String,
+    type: String,
+    referrerPolicy: String,
+    ping: String,
+};
+
+export interface AnchorFullProps extends AnchorProps, AnchorExtraAttrs {
+};
+
+export interface BlockquoteProps extends ElementProps {
+    cite: String,
+};
+
+export interface PreProps extends ElementProps {
+};
+
+export interface CodeProps extends ElementProps {
+};
+
+export interface KbdProps extends ElementProps {
+};
+
+export interface SampProps extends ElementProps {
+};
+
+export interface VarProps extends ElementProps {
+};
+
+export interface EmProps extends ElementProps {
+};
+
+export interface StrongProps extends ElementProps {
+};
+
+export interface SmallProps extends ElementProps {
+};
+
+export interface MarkProps extends ElementProps {
+};
+
+export interface DelProps extends ElementProps {
+    cite: String,
+    dateTime: String,
+};
+
+export interface InsProps extends ElementProps {
+    cite: String,
+    dateTime: String,
+};
+
+export interface SubProps extends ElementProps {
+};
+
+export interface SupProps extends ElementProps {
+};
+
+export interface AbbrProps extends ElementProps {
+    title: String,
+};
+
+export interface CiteProps extends ElementProps {
+};
+
+export interface QProps extends ElementProps {
+    cite: String,
+};
+
+export interface TimeProps extends ElementProps {
+    dateTime: String,
+};
+
+export interface DataProps extends ElementProps {
+    value: String,
+};
+
+export interface BdiProps extends ElementProps {
+};
+
+export interface BdoProps extends ElementProps {
+    dir: String,
+};
+
+export interface RubyProps extends ElementProps {
+};
+
+export interface RtProps extends ElementProps {
+};
+
+export interface RpProps extends ElementProps {
+};
+
+export interface BrProps extends ElementProps {
+};
+
+export interface WbrProps extends ElementProps {
+};
+
+export interface HrProps extends ElementProps {
+};

@@ -25,8 +25,8 @@ if (-not (Test-Path (Join-Path $repo "modules\socket\socket_shim.dll"))) {
     Write-Host "ERROR: falta modules\socket\socket_shim.dll (powershell -File modules\socket\build.ps1)"
     exit 2
 }
-if (-not (Test-Path (Join-Path $repo "modules\io\io_shim.dll"))) {
-    Write-Host "ERROR: falta modules\io\io_shim.dll (powershell -File modules\io\build.ps1)"
+if (-not (Test-Path (Join-Path $repo "modules\sqlite\sqlite_shim.dll"))) {
+    Write-Host "ERROR: falta modules\sqlite\sqlite_shim.dll (powershell -File modules\sqlite\build.ps1)"
     exit 2
 }
 
@@ -62,6 +62,13 @@ function CurlRaw($method, $path, $body, $headers) {
     }
     $curlArgs += "http://127.0.0.1:$port$path"
     return (& curl.exe @curlArgs 2>&1 | Out-String)
+}
+
+# JSON por stdin: evita que PowerShell/curl partan el body en argumentos.
+function CurlJson($path, $json) {
+    $url = "http://127.0.0.1:$port$path"
+    return ($json | & curl.exe -s -i -X POST -H "Content-Type: application/json" `
+        --data-binary "@-" $url 2>&1 | Out-String)
 }
 
 try {
@@ -117,6 +124,34 @@ try {
         Check "POST /api/echo status" ($r -match "HTTP/1\.1 200 OK") $r
         Check "POST /api/echo body" ($r -match '"recibido":"hola"') $r
 
+        $form = "name=Ana&email=ana%40example.com&password=secret123&password_confirmation=secret123"
+        $r = CurlRaw "POST" "/api/register" $form @("Content-Type: application/x-www-form-urlencoded")
+        Check "POST /api/register status" ($r -match "HTTP/1\.1 201 Created") $r
+        Check "POST /api/register name" ($r -match '"name":"Ana"') $r
+        Check "POST /api/register email" ($r -match '"email":"ana@example.com"') $r
+
+        $json = '{"name":"Beto","email":"beto@example.com","password":"secret123","password_confirmation":"secret123"}'
+        $r = CurlJson "/api/register" $json
+        Check "POST /api/register json" ($r -match "HTTP/1\.1 201 Created") $r
+        Check "POST /api/register json name" ($r -match '"name":"Beto"') $r
+
+        $r = CurlRaw "POST" "/api/register" "name=A&email=no&password=1" @("Content-Type: application/x-www-form-urlencoded")
+        Check "POST /api/register invalid" ($r -match "HTTP/1\.1 422 Unprocessable Entity") $r
+        Check "POST /api/register errors" ($r -match '"errors"') $r
+
+        $r = CurlRaw "POST" "/api/notes" "title=Hola" @("Content-Type: application/x-www-form-urlencoded")
+        Check "POST /api/notes status" ($r -match "HTTP/1\.1 201 Created") $r
+        Check "POST /api/notes title" ($r -match '"title":"Hola"') $r
+        $noteId = [regex]::Match($r, '"id":"?([0-9]+)"?').Groups[1].Value
+        if ($noteId -eq "") { $noteId = "1" }
+
+        $r = CurlRaw "GET" "/api/notes/$noteId" $null $null
+        Check "GET /api/notes/{id} status" ($r -match "HTTP/1\.1 200 OK") $r
+        Check "GET /api/notes/{id} title" ($r -match '"title":"Hola"') $r
+
+        $r = CurlRaw "GET" "/api/notes" $null $null
+        Check "GET /api/notes count" ($r -match '"count":1') $r
+
         $r = CurlRaw "GET" "/cookies" $null @("Cookie: a=1; b=two")
         Check "GET /cookies status" ($r -match "HTTP/1\.1 200 OK") $r
         Check "GET /cookies a" ($r -match "a=1;") $r
@@ -126,6 +161,13 @@ try {
         Check "GET /set-cookie status" ($r -match "HTTP/1\.1 302 Found") $r
         Check "GET /set-cookie location" ($r -match "location: /cookies") $r
         Check "GET /set-cookie header" ($r -match "set-cookie: visita=1; Path=/; HttpOnly") $r
+
+        $r = CurlRaw "GET" "/ui" $null $null
+        Check "GET /ui status" ($r -match "HTTP/1\.1 200 OK") $r
+        Check "GET /ui title" ($r -match "UI Kit") $r
+        Check "GET /ui button" ($r -match "<button") $r
+        Check "GET /ui card" ($r -match 'class="card"') $r
+        Check "GET /ui slot" ($r -match "slot de children") $r
 
         $r = CurlRaw "GET" "/public/css/style.css" $null $null
         Check "GET /public/css status" ($r -match "HTTP/1\.1 200 OK") $r

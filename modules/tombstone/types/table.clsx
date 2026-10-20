@@ -1,0 +1,43 @@
+# types/table.clsx - Tablas.
+
+from "./types/global" import ElementProps;
+
+export interface TableProps extends ElementProps {
+};
+
+export interface CaptionProps extends ElementProps {
+};
+
+export interface ColgroupProps extends ElementProps {
+    span: Int,
+};
+
+export interface ColProps extends ElementProps {
+    span: Int,
+};
+
+export interface TheadProps extends ElementProps {
+};
+
+export interface TbodyProps extends ElementProps {
+};
+
+export interface TfootProps extends ElementProps {
+};
+
+export interface TrProps extends ElementProps {
+};
+
+export interface ThProps extends ElementProps {
+    colSpan: Int,
+    rowSpan: Int,
+    headers: String,
+    scope: String,
+    abbr: String,
+};
+
+export interface TdProps extends ElementProps {
+    colSpan: Int,
+    rowSpan: Int,
+    headers: String,
+};

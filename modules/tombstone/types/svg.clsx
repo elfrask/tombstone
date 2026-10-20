@@ -1,0 +1,192 @@
+# types/svg.clsx - Etiquetas SVG (props en camelCase).
+#
+# El componente que renderiza SVG debe mapear `strokeWidth` -> `stroke-width`,
+# `viewBox` -> `viewBox`, etc. (los atributos SVG crudos se escriben tal cual).
+
+from "./types/global" import ElementProps;
+
+export interface SvgProps extends ElementProps {
+    viewBox: String,
+    width: String,
+    height: String,
+    xmlns: String,
+    fill: String,
+    stroke: String,
+    strokeWidth: String,
+    strokeLinecap: String,
+    strokeLinejoin: String,
+    ariaHidden: Bool,
+    role: String,
+};
+
+export interface GProps extends ElementProps {
+    fill: String,
+    stroke: String,
+    strokeWidth: String,
+    transform: String,
+    opacity: Float,
+};
+
+export interface PathProps extends ElementProps {
+    d: String,
+    fill: String,
+    stroke: String,
+    strokeWidth: String,
+    strokeLinecap: String,
+    strokeLinejoin: String,
+    opacity: Float,
+    transform: String,
+};
+
+export interface CircleProps extends ElementProps {
+    cx: String,
+    cy: String,
+    r: String,
+    fill: String,
+    stroke: String,
+    strokeWidth: String,
+    opacity: Float,
+};
+
+export interface EllipseProps extends ElementProps {
+    cx: String,
+    cy: String,
+    rx: String,
+    ry: String,
+    fill: String,
+    stroke: String,
+    strokeWidth: String,
+    opacity: Float,
+};
+
+export interface RectProps extends ElementProps {
+    x: String,
+    y: String,
+    width: String,
+    height: String,
+    rx: String,
+    ry: String,
+    fill: String,
+    stroke: String,
+    strokeWidth: String,
+    opacity: Float,
+};
+
+export interface LineProps extends ElementProps {
+    x1: String,
+    y1: String,
+    x2: String,
+    y2: String,
+    stroke: String,
+    strokeWidth: String,
+};
+
+export interface PolylineProps extends ElementProps {
+    points: String,
+    fill: String,
+    stroke: String,
+    strokeWidth: String,
+};
+
+export interface PolygonProps extends ElementProps {
+    points: String,
+    fill: String,
+    stroke: String,
+    strokeWidth: String,
+};
+
+export interface SvgTextProps extends ElementProps {
+    x: String,
+    y: String,
+    dx: String,
+    dy: String,
+    textAnchor: String,
+    dominantBaseline: String,
+    fill: String,
+    fontSize: String,
+    fontFamily: String,
+};
+
+export interface DefsProps extends ElementProps {
+};
+
+export interface UseProps extends ElementProps {
+    href: String,
+    x: String,
+    y: String,
+    width: String,
+    height: String,
+};
+
+export interface SymbolProps extends ElementProps {
+    viewBox: String,
+};
+
+export interface LinearGradientProps extends ElementProps {
+    x1: String,
+    y1: String,
+    x2: String,
+    y2: String,
+    gradientUnits: String,
+};
+
+export interface RadialGradientProps extends ElementProps {
+    cx: String,
+    cy: String,
+    r: String,
+    gradientUnits: String,
+};
+
+export interface StopProps extends ElementProps {
+    offset: String,
+    stopColor: String,
+    stopOpacity: Float,
+};
+
+export interface ClipPathProps extends ElementProps {
+};
+
+export interface MaskProps extends ElementProps {
+};
+
+export interface PatternProps extends ElementProps {
+    width: String,
+    height: String,
+    patternUnits: String,
+};
+
+export interface MarkerProps extends ElementProps {
+    markerWidth: String,
+    markerHeight: String,
+    refX: String,
+    refY: String,
+    orient: String,
+};
+
+export interface SvgImageProps extends ElementProps {
+    href: String,
+    x: String,
+    y: String,
+    width: String,
+    height: String,
+    preserveAspectRatio: String,
+};
+
+export interface SvgAnchorProps extends ElementProps {
+    href: String,
+    target: String,
+    rel: String,
+};
+
+export interface SvgTitleProps extends ElementProps {
+};
+
+export interface SvgDescProps extends ElementProps {
+};
+
+export interface ForeignObjectProps extends ElementProps {
+    x: String,
+    y: String,
+    width: String,
+    height: String,
+};

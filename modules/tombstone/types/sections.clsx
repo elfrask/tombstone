@@ -1,0 +1,52 @@
+# types/sections.clsx - Landmarks y contenedores de sección.
+
+from "./types/global" import ElementProps;
+
+export interface HeaderProps extends ElementProps {
+    role: String,
+};
+
+export interface FooterProps extends ElementProps {
+    role: String,
+};
+
+export interface MainProps extends ElementProps {
+    role: String,
+};
+
+export interface SectionProps extends ElementProps {
+    role: String,
+};
+
+export interface ArticleProps extends ElementProps {
+    role: String,
+};
+
+export interface AsideProps extends ElementProps {
+    role: String,
+};
+
+export interface NavProps extends ElementProps {
+    role: String,
+    ariaLabel: String,
+};
+
+export interface AddressProps extends ElementProps {
+};
+
+export interface DivProps extends ElementProps {
+    role: String,
+    hidden: Bool,
+};
+
+export interface SpanProps extends ElementProps {
+    role: String,
+    hidden: Bool,
+};
+
+export interface HGroupProps extends ElementProps {
+};
+
+export interface SearchProps extends ElementProps {
+    role: String,
+};
