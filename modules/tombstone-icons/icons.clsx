@@ -1,0 +1,136 @@
+# tombstone-icons/icons.clsx - Iconos SVG inline (trazo), sin dependencias.
+#
+# Se consumen por interpolación CMX: `{icon("route")}`. Devuelven `Cmx`, así
+# que NO se usan como componente uppercase: el renderer invoca componentes con
+# `tagCallable` y espera un String.
+#
+# El parámetro se llama `name` (String): `method` no se puede usar (keyword).
+
+
+# --------------------------------------------------------------- iconos ---
+
+function ico_route() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="6" cy="19" r="3" />
+            <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+            <circle cx="18" cy="5" r="3" />
+        </svg>
+    );
+};
+
+function ico_layers() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+            <path d="m2 17 10 5 10-5" />
+            <path d="m2 12 10 5 10-5" />
+        </svg>
+    );
+};
+
+function ico_code() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m16 18 6-6-6-6" />
+            <path d="m8 6-6 6 6 6" />
+        </svg>
+    );
+};
+
+function ico_socket() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+        </svg>
+    );
+};
+
+function ico_globe() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" />
+            <path d="M2 12h20" />
+        </svg>
+    );
+};
+
+function ico_cookie() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5Z" />
+            <path d="M8.5 8.5v.01" />
+            <path d="M16 15.5v.01" />
+            <path d="M12 12v.01" />
+        </svg>
+    );
+};
+
+function ico_folder() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+        </svg>
+    );
+};
+
+function ico_braces() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1" />
+            <path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1" />
+        </svg>
+    );
+};
+
+function ico_tick() -> Cmx {
+    return (
+        <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5" />
+        </svg>
+    );
+};
+
+# Marca: arco de lapida + rayo.
+function ico_logo() -> Cmx {
+    return (
+        <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <path d="M34 25 L24 37 h6.5 L28 45 L40 32 h-6.5 Z" fill="currentColor" />
+            <path d="M18 47 V28.5 a14 14 0 0 1 28 0 V47" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" />
+            <path d="M13 47 h38" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" opacity="0.5" />
+        </svg>
+    );
+};
+
+# Fallback: un punto (no rompe si el nombre no existe).
+function ico_dot() -> Cmx {
+    return (
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+        </svg>
+    );
+};
+
+
+# ----------------------------------------------------------- API pública ---
+# `icon("route") -> Cmx`. Uso en CMX (interpolación):
+#
+#   <li>{icon("route")}<span>Router</span></li>
+#
+# El renderer soporta componentes uppercase (`<Card />`) vía `tagCallable`,
+# pero estos helpers devuelven `Cmx` (no String), por eso se interpolan.
+
+export function icon(name: String) -> Cmx {
+    if (name == "route") { return ico_route(); };
+    if (name == "layers") { return ico_layers(); };
+    if (name == "code") { return ico_code(); };
+    if (name == "socket") { return ico_socket(); };
+    if (name == "globe") { return ico_globe(); };
+    if (name == "cookie") { return ico_cookie(); };
+    if (name == "folder") { return ico_folder(); };
+    if (name == "braces") { return ico_braces(); };
+    if (name == "tick") { return ico_tick(); };
+    if (name == "logo") { return ico_logo(); };
+    return ico_dot();
+};

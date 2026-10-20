@@ -1,0 +1,90 @@
+# tombstone/router.clsx - Router con parámetros de ruta (`/users/{id}`).
+#
+# Matching por método + segmentos, params posicionales y 404/405.
+# Las constraints (`where`), opcionales (`{id?}`) y named routes quedan para
+# la siguiente fase de routing.
+from "httpd" import Request, Response;
+
+export class RouteMatch {
+    public var matched: bool;
+    public var params: Record<String, String>;
+
+    function main(matched: bool, params: Record<String, String>) {
+        me.matched = matched;
+        me.params = params;
+    }
+}
+
+export class Route {
+    public var http_method: String;
+    public var pattern: String;
+    public var handler: (Request) -> Response;
+
+    function main(http_method: String, pattern: String, handler: (Request) -> Response) {
+        me.http_method = http_method;
+        me.pattern = pattern;
+        me.handler = handler;
+    }
+}
+
+# Compara patrón y path segmento a segmento. `{x}` captura en params.
+# Nota: el parámetro no se llama `path` porque ese identificador se parsea como
+# namespace del módulo interno homónimo (bug del lenguaje; ver README).
+export function route_matches(pattern: String, route_path: String) -> RouteMatch {
+    var params: Record<String, String> = {};
+    var pp = pattern.split("/");
+    var sp = route_path.split("/");
+    if (pp.length != sp.length) {
+        return RouteMatch(false, params);
+    }
+
+    for each seg and i in (pp) {
+        if (seg.length > 2 && seg[0] == "{" && seg[seg.length - 1] == "}") {
+            var name = seg.slice(1, seg.length - 1);
+            params[name] = sp[i];
+        } elif (seg != sp[i]) {
+            return RouteMatch(false, params);
+        };
+    }
+    return RouteMatch(true, params);
+}
+
+export class Router {
+    public var routes: Route[];
+
+    function main() {
+        me.routes = [];
+    }
+
+    function add(http_method: String, pattern: String, handler: (Request) -> Response) {
+        me.routes.push(Route(http_method, pattern, handler));
+    }
+
+    function get(pattern: String, handler: (Request) -> Response) { me.add("GET", pattern, handler); }
+    function post(pattern: String, handler: (Request) -> Response) { me.add("POST", pattern, handler); }
+    function put(pattern: String, handler: (Request) -> Response) { me.add("PUT", pattern, handler); }
+    function patch(pattern: String, handler: (Request) -> Response) { me.add("PATCH", pattern, handler); }
+    function delete_route(pattern: String, handler: (Request) -> Response) { me.add("DELETE", pattern, handler); }
+    function options(pattern: String, handler: (Request) -> Response) { me.add("OPTIONS", pattern, handler); }
+
+    # 404 si no hay match; 405 si el path existe con otro método.
+    function dispatch(req: Request) -> Response {
+        var path_exists = false;
+        for each r in (me.routes) {
+            var m = route_matches(r.pattern, req.path);
+            if (m.matched) {
+                path_exists = true;
+                if (r.http_method == req.http_method) {
+                    req.params = m.params;
+                    var h = r.handler;
+                    return h(req);
+                };
+            };
+        };
+
+        if (path_exists) {
+            return Response.status_only(405);
+        };
+        return Response.not_found();
+    }
+}

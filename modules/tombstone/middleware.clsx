@@ -1,0 +1,20 @@
+# tombstone/middleware.clsx - Middleware como función `(Request) -> Response`.
+#
+# Convención: un middleware que devuelve `status == 0` no responde y deja seguir
+# la cadena (puede mutar el `Request`); un status distinto corta el pipeline.
+from "httpd" import Request, Response;
+
+export class Middleware {
+    public var mw_name: String;
+    public var mw_run: (Request) -> Response;
+
+    function main(mw_name: String, mw_run: (Request) -> Response) {
+        me.mw_name = mw_name;
+        me.mw_run = mw_run;
+    }
+
+    function run(req: Request) -> Response {
+        var f = me.mw_run;
+        return f(req);
+    }
+}

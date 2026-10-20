@@ -1,0 +1,138 @@
+# tombstone/app.clsx - App HTTP: middleware + router + static + CORS.
+#
+# El transporte (accept/read/write) vive en `modules/httpd` + `modules/socket`;
+# acá solo se compone el pipeline de una request.
+from "httpd" import Request, Response;
+import "httpd" as httpd;
+
+from "./router" import Router;
+from "./middleware" import Middleware;
+from "./static" import StaticHandler;
+from "./cors" import CorsOptions, cors_apply;
+
+export class App {
+    public var router: Router;
+    public var cors_options: CorsOptions;
+    public var middlewares: Middleware[];
+    public var statics: StaticHandler[];
+    public var use_cors: bool;
+    public var verbose: bool;
+
+    function main() {
+        me.router = Router();
+        me.cors_options = CorsOptions();
+        me.middlewares = [];
+        me.statics = [];
+        me.use_cors = false;
+        me.verbose = true;
+    }
+
+    # --- registro de rutas ------------------------------------------------
+    function get(pattern: String, handler: (Request) -> Response) -> App {
+        me.router.get(pattern, handler);
+        return me;
+    }
+
+    function post(pattern: String, handler: (Request) -> Response) -> App {
+        me.router.post(pattern, handler);
+        return me;
+    }
+
+    function put(pattern: String, handler: (Request) -> Response) -> App {
+        me.router.put(pattern, handler);
+        return me;
+    }
+
+    function patch(pattern: String, handler: (Request) -> Response) -> App {
+        me.router.patch(pattern, handler);
+        return me;
+    }
+
+    function delete_route(pattern: String, handler: (Request) -> Response) -> App {
+        me.router.delete_route(pattern, handler);
+        return me;
+    }
+
+    function options(pattern: String, handler: (Request) -> Response) -> App {
+        me.router.options(pattern, handler);
+        return me;
+    }
+
+    # --- extensiones ------------------------------------------------------
+    function use(mw_name: String, fn: (Request) -> Response) -> App {
+        me.middlewares.push(Middleware(mw_name, fn));
+        return me;
+    }
+
+    function serve_static(prefix: String, directory: String) -> App {
+        me.statics.push(StaticHandler(prefix, directory));
+        return me;
+    }
+
+    function cors(options: CorsOptions) -> App {
+        me.cors_options = options;
+        me.use_cors = true;
+        return me;
+    }
+
+    # --- pipeline ---------------------------------------------------------
+    # Request crudo -> Response (sin sockets; útil para tests/autotest).
+    function handle(raw: String) -> Response {
+        if (raw.length == 0) {
+            var bad = Response(400, "400 Bad Request");
+            bad.headers["content-type"] = "text/plain; charset=utf-8";
+            return me.finish(bad);
+        };
+        return me.dispatch(Request.parse(raw));
+    }
+
+    # Request tipado -> static -> CORS preflight -> middleware -> router.
+    function dispatch(req: Request) -> Response {
+        try {
+            for each sh in (me.statics) {
+                var sres = sh.handle(req);
+                if (sres.status != 0) {
+                    return me.finish(sres);
+                };
+            };
+
+            if (me.use_cors && req.http_method == "OPTIONS") {
+                return me.finish(Response.status_only(204));
+            };
+
+            for each mw in (me.middlewares) {
+                var mres = mw.run(req);
+                if (mres.status != 0) {
+                    return me.finish(mres);
+                };
+            };
+
+            return me.finish(me.router.dispatch(req));
+        } catch (err) {
+            print("[tombstone] error: " + str(err));
+            var res = Response(500, "500 Internal Server Error");
+            res.headers["content-type"] = "text/plain; charset=utf-8";
+            return me.finish(res);
+        };
+    }
+
+    function finish(res: Response) -> Response {
+        if (me.use_cors) {
+            return cors_apply(res, me.cors_options);
+        };
+        return res;
+    }
+
+    # Loop bloqueante: accept -> read -> dispatch -> write -> close.
+    function serve(host: String, port: int) -> int {
+        var self = me;
+        return httpd::serve(host, port, (req: Request) -> Response {
+            return self.dispatch(req);
+        });
+    }
+}
+
+# Atajo compatible con la API histórica: `serve(app, port)`.
+export function serve(app: App, port: int) -> int {
+    return app.serve("127.0.0.1", port);
+}

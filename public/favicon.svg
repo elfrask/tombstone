@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 64 64"
+     width="64"
+     height="64"
+     role="img"
+     aria-label="Tombstone">
+    <defs>
+        <linearGradient id="tg-bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#0b1020" />
+            <stop offset="1" stop-color="#131d33" />
+        </linearGradient>
+        <linearGradient id="tg-mark" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#34d399" />
+            <stop offset="0.55" stop-color="#22d3ee" />
+            <stop offset="1" stop-color="#60a5fa" />
+        </linearGradient>
+    </defs>
+
+    <rect width="64" height="64" rx="14" fill="url(#tg-bg)" />
+    <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25"
+          fill="none" stroke="rgba(148,163,184,0.22)" stroke-width="1.5" />
+
+    <path d="M34 25 L24 37 h6.5 L28 45 L40 32 h-6.5 Z"
+          fill="url(#tg-mark)" />
+
+    <path d="M18 47 V28.5 a14 14 0 0 1 28 0 V47"
+          fill="none" stroke="url(#tg-mark)" stroke-width="4.5"
+          stroke-linecap="round" />
+    <path d="M13 47 h38" fill="none" stroke="#e2e8f0" stroke-width="4.5"
+          stroke-linecap="round" opacity="0.55" />
+</svg>

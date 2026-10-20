@@ -1,0 +1,40 @@
+from "tombstone" import Router, Request, Response, route_matches;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var m = route_matches("/users/{id}", "/users/42");
+    check::assertTrue("match.matched", m.matched);
+    check::assertEqStr("match.id", m.params["id"], "42");
+
+    var no = route_matches("/users/{id}", "/posts/42");
+    check::assertTrue("match.no", !no.matched);
+
+    var r = Router();
+    r.get("/", (req: Request) -> Response {
+        return Response.text("home");
+    });
+    r.get("/users/{id}", (req: Request) -> Response {
+        return Response.text("id=" + req.param("id"));
+    });
+
+    var home = r.dispatch(Request.parse("GET / HTTP/1.1\r\nHost: x\r\n\r\n"));
+    check::assertEq("router.home.status", home.status, 200);
+    check::assertEqStr("router.home.body", home.body, "home");
+
+    var user = r.dispatch(Request.parse("GET /users/7 HTTP/1.1\r\nHost: x\r\n\r\n"));
+    check::assertEq("router.user.status", user.status, 200);
+    check::assertEqStr("router.user.body", user.body, "id=7");
+
+    var wrong = r.dispatch(Request.parse("POST /users/7 HTTP/1.1\r\nHost: x\r\n\r\n"));
+    check::assertEq("router.405", wrong.status, 405);
+
+    var missing = r.dispatch(Request.parse("GET /nope HTTP/1.1\r\nHost: x\r\n\r\n"));
+    check::assertEq("router.404", missing.status, 404);
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+}

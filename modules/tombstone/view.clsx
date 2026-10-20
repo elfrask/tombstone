@@ -1,0 +1,136 @@
+# tombstone/view.clsx - Renderer CMX -> HTML (CLS puro, 0 host nuevo).
+#
+# El runtime de CMX construye un DOM virtual (`Cmx { tag, props, children }`,
+# con `kind`: 1 = texto, 0 = elemento) pero NO lo serializa a HTML. Este motor
+# recorre el árbol y produce HTML:
+#
+#   e(s)      -> escape HTML de texto y valores de atributo
+#   render(c) -> HTML de un Cmx (recursivo)
+#   raw(html) -> marcador de HTML confiable (no se escapa)
+#
+# Modelo de seguridad: TODO lo interpolado se escapa salvo `raw()` explícito.
+#
+# Límites: los children que son `Array` no se expanden solos; usar
+# `renderEach(items, fn)` + `raw(...)` para bucles.
+
+# --- escape ---------------------------------------------------------------
+export function e(s: String) -> String {
+    var out = "";
+    for each c in (s.toChar()) {
+        var n = ord(c);
+        out = out + match (n) in {
+            38 -> "&amp;",
+            60 -> "&lt;",
+            62 -> "&gt;",
+            34 -> "&quot;",
+            39 -> "&#39;",
+            default -> c.toString(),
+        };
+    }
+    return out;
+}
+
+# --- atributos ------------------------------------------------------------
+export function isVoid(tag: String) -> bool {
+    return match (tag) in {
+        ("area", "base", "br", "col", "embed", "hr", "img", "input", "link",
+         "meta", "param", "source", "track", "wbr") -> true,
+        default -> false,
+    };
+}
+
+# Ordena las claves de props alfabéticamente (salida determinista).
+function sortKeys(ks: String[]) -> String[] {
+    var a = ks;
+    for (var i = 1; i < a.length; i++) {
+        var key = a[i];
+        var j = i - 1;
+        while (j >= 0 && a[j] > key) {
+            a[j + 1] = a[j];
+            j = j - 1;
+        };
+        a[j + 1] = key;
+    }
+    return a;
+}
+
+# ` key="valor"` por cada prop; prop `true` -> atributo booleano desnudo.
+export function attrs(c: Cmx) -> String {
+    var ks = sortKeys(c.props.keys());
+    var out = "";
+    for each k in (ks) {
+        if (c.props[k] == true) {
+            out = out + " " + k;
+        } else {
+            out = out + " " + k + "=\"" + e(str(c.props[k])) + "\"";
+        };
+    }
+    return out;
+}
+
+# --- raw ------------------------------------------------------------------
+# HTML confiable: el renderer lo emite sin escapar.
+export function raw(html: String) -> Cmx {
+    return (<raw>{html}</raw>);
+}
+
+# --- render ---------------------------------------------------------------
+export function render(c: Cmx) -> String {
+    if (c.kind == 1) {
+        return e(c.tag);
+    };
+    if (c.isComponent) {
+        var html: String = c.tagCallable(c.props, c.children);
+        return html;
+    };
+    var tag: String = c.tag;
+    if (tag == "raw") {
+        var rawOut = "";
+        for each ch in (c.children) {
+            rawOut = rawOut + match (ch.kind) in {
+                1 -> ch.tag,
+                default -> render(ch),
+            };
+        };
+        return rawOut;
+    };
+    var inner = "";
+    for each ch in (c.children) {
+        inner = inner + render(ch);
+    };
+    if (isVoid(tag)) {
+        return "<" + tag + attrs(c) + " />";
+    };
+    return "<" + tag + attrs(c) + ">" + inner + "</" + tag + ">";
+}
+
+# --- helpers de composición (bucles y layouts) ----------------------------
+export function renderEach(items: String[], fn: (String) -> Cmx) -> String {
+    var out = "";
+    for each it in (items) {
+        out = out + render(fn(it));
+    };
+    return out;
+}
+
+export function layout(title: String, body: Cmx) -> Cmx {
+    return (
+        <html lang="es">
+            <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <title>{title}</title>
+            </head>
+            <body>{body}</body>
+        </html>
+    );
+}
+
+# Lista dinámica: genera HTML ya renderizado (raw: no se re-escapa).
+export function ul_items(items: String[]) -> Cmx {
+    var html = "";
+    for each item in (items) {
+        html = html + "<li>" + e(item) + "</li>";
+    };
+    return raw(html);
+}

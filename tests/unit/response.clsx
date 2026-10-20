@@ -1,0 +1,31 @@
+from "tombstone" import Response;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var text = Response.text("hola");
+    var raw = text.serialize();
+    check::assertTrue("res.text.status", raw.startsWith("HTTP/1.1 200 OK\r\n"));
+    check::assertTrue("res.text.type", raw.contains("content-type: text/plain; charset=utf-8\r\n"));
+    check::assertTrue("res.text.len", raw.contains("content-length: 4\r\n"));
+    check::assertTrue("res.text.body", raw.endsWith("\r\n\r\nhola"));
+
+    var html = Response.html("<h1>x</h1>");
+    check::assertTrue("res.html.type", html.serialize().contains("content-type: text/html; charset=utf-8\r\n"));
+
+    var js = Response.json_raw("{\"ok\":true}");
+    check::assertTrue("res.json.type", js.serialize().contains("content-type: application/json; charset=utf-8\r\n"));
+
+    var red = Response.redirect("/login", 302);
+    check::assertTrue("res.redirect.status", red.serialize().startsWith("HTTP/1.1 302 Found\r\n"));
+    check::assertTrue("res.redirect.loc", red.serialize().contains("location: /login\r\n"));
+
+    var nf = Response.not_found();
+    check::assertTrue("res.404.status", nf.serialize().startsWith("HTTP/1.1 404 Not Found\r\n"));
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+}

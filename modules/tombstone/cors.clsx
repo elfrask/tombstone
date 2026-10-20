@@ -1,0 +1,39 @@
+# tombstone/cors.clsx - CORS (headers + preflight).
+#
+# `cors_apply` agrega los headers a cualquier respuesta; `cors_preflight`
+# responde un OPTIONS con 204.
+from "httpd" import Request, Response;
+
+export class CorsOptions {
+    public var origin: String;
+    public var methods: String;
+    public var headers: String;
+    public var max_age: int;
+    public var credentials: bool;
+
+    function main() {
+        me.origin = "*";
+        me.methods = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
+        me.headers = "Content-Type, Authorization";
+        me.max_age = 86400;
+        me.credentials = false;
+    }
+}
+
+export function cors_apply(res: Response, options: CorsOptions) -> Response {
+    res.headers["access-control-allow-origin"] = options.origin;
+    res.headers["access-control-allow-methods"] = options.methods;
+    res.headers["access-control-allow-headers"] = options.headers;
+    res.headers["access-control-max-age"] = options.max_age.toString();
+    if (options.credentials) {
+        res.headers["access-control-allow-credentials"] = "true";
+    };
+    return res;
+}
+
+export function cors_preflight(req: Request, options: CorsOptions) -> Response {
+    if (req.http_method != "OPTIONS") {
+        return Response.status_only(0);
+    };
+    return cors_apply(Response.status_only(204), options);
+}

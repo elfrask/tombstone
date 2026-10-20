@@ -1,0 +1,59 @@
+# tombstone/cookies.clsx - Cookies (parseo de `Cookie` y `Set-Cookie`).
+#
+#   parse_cookies("a=1; b=2") -> {a:"1", b:"2"}
+#   serialize_cookie("visita", "1", opts) -> "visita=1; Path=/; HttpOnly"
+export class CookieOptions {
+    public var path: String;
+    public var domain: String;
+    public var max_age: int;
+    public var secure: bool;
+    public var http_only: bool;
+    public var same_site: String;
+
+    function main() {
+        me.path = "/";
+        me.domain = "";
+        me.max_age = 0;
+        me.secure = false;
+        me.http_only = false;
+        me.same_site = "";
+    }
+}
+
+export function parse_cookies(header: String) -> Record<String, String> {
+    var out: Record<String, String> = {};
+    if (header.length == 0) {
+        return out;
+    };
+    var pairs = header.split(";");
+    for each pair in (pairs) {
+        var kv = pair.split("=");
+        if (kv.length == 2) {
+            out[kv[0].trim()] = kv[1].trim();
+        };
+    };
+    return out;
+}
+
+export function serialize_cookie(name: String, value: String, options: CookieOptions) -> String {
+    var out = name + "=" + value;
+    if (options.path.length > 0) {
+        out = out + "; Path=" + options.path;
+    };
+    if (options.domain.length > 0) {
+        out = out + "; Domain=" + options.domain;
+    };
+    if (options.max_age != 0) {
+        out = out + "; Max-Age=" + options.max_age.toString();
+    };
+    if (options.secure) {
+        out = out + "; Secure";
+    };
+    if (options.http_only) {
+        out = out + "; HttpOnly";
+    };
+    if (options.same_site.length > 0) {
+        out = out + "; SameSite=" + options.same_site;
+    };
+    return out;
+}

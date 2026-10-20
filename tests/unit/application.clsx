@@ -1,0 +1,40 @@
+from "tombstone" import App, Request, Response;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var app = App();
+
+    app.use("guard", (req: Request) -> Response {
+        if (req.path == "/private") {
+            return Response.text("denied").header("x-guard", "1");
+        };
+        return Response.status_only(0);
+    });
+
+    app.get("/users/{id}", (req: Request) -> Response {
+        return Response.text("id=" + req.param("id"));
+    });
+
+    app.post("/echo", (req: Request) -> Response {
+        return Response.text("echo:" + req.body);
+    });
+
+    var ok = app.handle("GET /users/9 HTTP/1.1\r\nHost: x\r\n\r\n");
+    check::assertEq("app.route.status", ok.status, 200);
+    check::assertEqStr("app.route.body", ok.body, "id=9");
+
+    var echoed = app.handle("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Length: 3\r\n\r\nabc");
+    check::assertEqStr("app.echo.body", echoed.body, "echo:abc");
+
+    var denied = app.handle("GET /private HTTP/1.1\r\nHost: x\r\n\r\n");
+    check::assertEq("app.mw.status", denied.status, 200);
+    check::assertEqStr("app.mw.body", denied.body, "denied");
+    check::assertEqStr("app.mw.header", denied.headers["x-guard"], "1");
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+}

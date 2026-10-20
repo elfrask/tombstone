@@ -1,0 +1,35 @@
+# tombstone/mod.clsx - Barrel público del framework.
+#
+# Un consumidor hace `from "tombstone" import App, Request, Response, ...;`
+# (el proyecto lo resuelve desde `modules/tombstone/`).
+from "httpd" import Request, Response, statusReason, isSuccess, isRedirect;
+from "httpd" import parseQuery, contentLength;
+
+from "./status" import HttpStatus;
+from "./router" import Router, Route, RouteMatch, route_matches;
+from "./middleware" import Middleware;
+from "./app" import App, serve;
+from "./static" import StaticHandler, content_type_for, str_starts_with, str_ends_with;
+from "./cors" import CorsOptions, cors_apply, cors_preflight;
+from "./cookies" import CookieOptions, parse_cookies, serialize_cookie;
+from "./json" import json_encode, json_decode, json_parse_safe, json_body;
+from "./json" import json_response, json_response_raw, json_string_array;
+from "./lib" import system_pid, system_uptime_ms, system_env;
+from "./view" import raw, e, render, attrs, isVoid, renderEach, layout, ul_items;
+from "./template" import MetaTag, Template, render_html;
+
+export { Request, Response, statusReason, isSuccess, isRedirect };
+export { parseQuery, parseQuery as parse_query };
+export { contentLength, contentLength as content_length };
+export { HttpStatus };
+export { Router, Route, RouteMatch, route_matches };
+export { Middleware };
+export { App, App as Application, serve };
+export { StaticHandler, content_type_for, str_starts_with, str_ends_with };
+export { CorsOptions, cors_apply, cors_preflight };
+export { CookieOptions, parse_cookies, serialize_cookie };
+export { json_encode, json_decode, json_parse_safe, json_body };
+export { json_response, json_response_raw, json_string_array };
+export { system_pid, system_uptime_ms, system_env };
+export { raw, e, render, attrs, isVoid, renderEach, layout, ul_items };
+export { MetaTag, Template, render_html };

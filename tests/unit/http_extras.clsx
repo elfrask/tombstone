@@ -1,0 +1,54 @@
+from "tombstone" import CookieOptions, parse_cookies, serialize_cookie;
+from "tombstone" import CorsOptions, cors_apply, cors_preflight;
+from "tombstone" import Request, Response, HttpStatus;
+from "tombstone" import json_encode, json_body, json_string_array;
+from "tombstone" import content_type_for;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    # status
+    check::assertEq("status.ok", HttpStatus.OK, 200);
+    check::assertEqStr("status.reason", HttpStatus.reason(404), "Not Found");
+
+    # cookies
+    var jar = parse_cookies("a=1; b=two");
+    check::assertEqStr("cookie.a", jar["a"], "1");
+    check::assertEqStr("cookie.b", jar["b"], "two");
+
+    var opts = CookieOptions();
+    opts.path = "/";
+    opts.max_age = 3600;
+    opts.secure = true;
+    opts.http_only = true;
+    opts.same_site = "Lax";
+    check::assertEqStr("cookie.serialize", serialize_cookie("visita", "1", opts),
+        "visita=1; Path=/; Max-Age=3600; Secure; HttpOnly; SameSite=Lax");
+
+    # CORS
+    var cors = CorsOptions();
+    var res = cors_apply(Response.text("x"), cors);
+    check::assertEqStr("cors.origin", res.headers["access-control-allow-origin"], "*");
+    check::assertTrue("cors.methods", res.headers["access-control-allow-methods"].contains("GET"));
+
+    var pre = cors_preflight(Request.parse("OPTIONS /x HTTP/1.1\r\nHost: x\r\n\r\n"), cors);
+    check::assertEq("cors.preflight.status", pre.status, 204);
+    check::assertEqStr("cors.preflight.origin", pre.headers["access-control-allow-origin"], "*");
+
+    # JSON
+    check::assertEqStr("json.encode", json_encode({status: "ok"}), "{\"status\":\"ok\"}");
+    check::assertEqStr("json.array", json_string_array(["a", "b"]), "[\"a\",\"b\"]");
+    var jr = json_body(Request.parse("POST /x HTTP/1.1\r\nHost: x\r\n\r\n{\"a\":1}"));
+    check::assertEqStr("json.body.a", str(jr["a"]), "1");
+
+    # static content types
+    check::assertEqStr("static.css", content_type_for("a.css"), "text/css; charset=utf-8");
+    check::assertEqStr("static.js", content_type_for("a.js"), "application/javascript; charset=utf-8");
+    check::assertEqStr("static.svg", content_type_for("a.svg"), "image/svg+xml");
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+}

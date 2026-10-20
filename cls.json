@@ -1,0 +1,8 @@
+{
+  "name": "tombstone",
+  "version": "0.2.0",
+  "description": "Tombstone: framework web para CLS (módulo + proyecto demo)",
+  "entry": "src/main.clsx",
+  "testEntry": ["tests/unit/**/*.clsx"],
+  "pathModules": ["../../modules"]
+}

@@ -1,0 +1,33 @@
+from "tombstone" import render, raw, renderEach, e;
+import "check" as check;
+
+# Componente CMX (tag mayúscula): devuelve HTML ya renderizado.
+function Card(props: Record<String, Value>, children: Cmx[]) -> String {
+    return "<article class=\"card\">" + e(str(props.title)) + "</article>";
+}
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var el = (
+        <div class="x" hidden={true}>
+            <br />
+            <span>{"a & b"}</span>
+        </div>
+    );
+    check::assertEqStr("view.attrs", render(el),
+        "<div class=\"x\" hidden><br /><span>a &amp; b</span></div>");
+
+    check::assertEqStr("view.raw", render(raw("<b>x</b>")), "<b>x</b>");
+
+    var lis = renderEach(["a", "<b>"], (s: String) -> <li>{s}</li>);
+    check::assertEqStr("view.renderEach", lis, "<li>a</li><li>&lt;b&gt;</li>");
+
+    var comp = (<Card title="x & y" />);
+    check::assertEqStr("view.component", render(comp), "<article class=\"card\">x &amp; y</article>");
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+}

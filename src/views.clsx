@@ -1,0 +1,101 @@
+# src/views.clsx - Vistas CMX del proyecto demo (no del motor).
+#
+# El entry las importa por ruta relativa (`from "./views" import ...`). Los
+# helpers internos no se exportan; solo `nav` y `home_view` son API pública.
+#
+# Los iconos viven en `modules/tombstone-icons` y se insertan por interpolación
+# CMX: `{icon("route")}`. Los componentes uppercase (`<Card />`) también están
+# soportados por el renderer, pero deben devolver String; los iconos devuelven
+# Cmx, por eso se interpolan.
+
+from "tombstone" import raw;
+from "tombstone-icons" import icon;
+
+
+# -------------------------------------------------------------- helpers ---
+
+function chip(ico_name: String, label: String) -> Cmx {
+    return (
+        <li>{icon(ico_name)}<span>{label}</span></li>
+    );
+};
+
+
+# ------------------------------------------------------------------ nav ---
+
+export function nav() -> Cmx {
+    return (
+        <header class="nav">
+            <div class="nav__inner">
+                <a class="brand" href="#top" aria-label="Tombstone, inicio">
+                    <span class="brand__mark">{icon("logo")}</span>
+                    <span class="brand__name">tombstone</span>
+                    <span class="brand__badge">v1.0</span>
+                </a>
+                <span class="nav__spacer"></span>
+                <a class="btn btn--primary btn--sm" href="#code">Comenzar</a>
+            </div>
+        </header>
+    );
+};
+
+
+# --------------------------------------------------------------- pagina ---
+
+export function home_view(header: Cmx) -> Cmx {
+    var term = "<span class=\"t-m\"># src/main.clsx</span>\n"
+        + "<span class=\"t-k\">app.get</span>(<span class=\"t-s\">\"/users/{id}\"</span>, (req: Request) -> Response {\n"
+        + "    <span class=\"t-k\">return</span> Response.<span class=\"t-f\">json</span>({ <span class=\"t-s\">\"id\"</span>: req.params[<span class=\"t-s\">\"id\"</span>] });\n"
+        + "});\n"
+        + "\n"
+        + "<span class=\"t-p\">$</span> clx run src/main.clsx -- 8080\n"
+        + "<span class=\"t-c\">Servidor en http://localhost:8080</span><span class=\"t-cur\"></span>";
+
+    return (
+        <div class="page" id="top">
+            {header}
+            <main class="main">
+                <section class="hero">
+                    <div class="hero__glow"></div>
+                    <div class="wrap hero__grid">
+                        <div class="hero__copy">
+                            <span class="kicker">100% CLS puro · sin dependencias</span>
+                            <h1 class="hero__title">Tombstone<span class="caret" aria-hidden="true"></span></h1>
+                            <p class="hero__lead">Framework HTTP en CLS. Rutas, no boilerplate.</p>
+                            <div class="hero__cta">
+                                <a class="btn btn--primary" href="#code">Comenzar</a>
+                                <a class="btn btn--ghost" href="/api/health">API en vivo</a>
+                            </div>
+                            <ul class="chips">
+                                {chip("route", "Router")}
+                                {chip("layers", "Middleware")}
+                                {chip("code", "CMX")}
+                                {chip("socket", "Sockets")}
+                                {chip("globe", "CORS")}
+                                {chip("cookie", "Cookies")}
+                            </ul>
+                        </div>
+
+                        <div class="terminal" id="code" role="img" aria-label="Una ruta de ejemplo">
+                            <div class="terminal__bar">
+                                <em>src/main.clsx</em>
+                                <span class="term__live"><i></i>live</span>
+                            </div>
+                            <pre class="terminal__body">{raw(term)}</pre>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="footer">
+                <div class="wrap footer__inner">
+                    <span class="footer__brand">{icon("logo")} Tombstone</span>
+                    <span class="status" data-status="checking">
+                        <span class="status__dot"></span>
+                        <span data-status-text="1">comprobando servidor…</span>
+                    </span>
+                </div>
+            </footer>
+        </div>
+    );
+};

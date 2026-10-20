@@ -1,0 +1,7 @@
+# tombstone-icons/mod.clsx - Barrel de iconos SVG inline.
+#
+# Uso en CMX: `{icon("route")}` (interpolación). No usar `<Icons ... />`:
+# los componentes se invocan con `tagCallable` y estos helpers devuelven Cmx.
+from "./icons" import *;
+
+export { icon };

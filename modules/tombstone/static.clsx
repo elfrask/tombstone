@@ -1,0 +1,76 @@
+# tombstone/static.clsx - Archivos estáticos (CLS + `modules/io` FFI).
+#
+# `io` es el módulo global de I/O (FFI a C, sin `host_call fs`). El shim
+# `io_shim.dll` se resuelve relativo al CWD: ejecutar desde la raíz del repo CLS.
+import "io" as io;
+
+from "httpd" import Request, Response;
+
+export function str_starts_with(s: String, prefix: String) -> bool {
+    return s.startsWith(prefix);
+}
+
+export function str_ends_with(s: String, suffix: String) -> bool {
+    return s.endsWith(suffix);
+}
+
+export function content_type_for(file_path: String) -> String {
+    if (file_path.endsWith(".html")) { return "text/html; charset=utf-8"; };
+    if (file_path.endsWith(".css")) { return "text/css; charset=utf-8"; };
+    if (file_path.endsWith(".js")) { return "application/javascript; charset=utf-8"; };
+    if (file_path.endsWith(".json")) { return "application/json; charset=utf-8"; };
+    if (file_path.endsWith(".png")) { return "image/png"; };
+    if (file_path.endsWith(".jpg")) { return "image/jpeg"; };
+    if (file_path.endsWith(".jpeg")) { return "image/jpeg"; };
+    if (file_path.endsWith(".gif")) { return "image/gif"; };
+    if (file_path.endsWith(".svg")) { return "image/svg+xml"; };
+    if (file_path.endsWith(".ico")) { return "image/x-icon"; };
+    if (file_path.endsWith(".txt")) { return "text/plain; charset=utf-8"; };
+    return "application/octet-stream";
+}
+
+export class StaticHandler {
+    public var prefix: String;
+    public var directory: String;
+
+    function main(prefix: String, directory: String) {
+        me.prefix = prefix;
+        me.directory = directory;
+    }
+
+    # Devuelve la Response del archivo, o status 0 si el path no matchea el
+    # prefijo (el App sigue con las rutas).
+    function handle(req: Request) -> Response {
+        if (req.http_method != "GET" && req.http_method != "HEAD") {
+            return Response.status_only(0);
+        };
+
+        if (!req.path.startsWith(me.prefix)) {
+            return Response.status_only(0);
+        };
+
+        var rel = req.path.slice(me.prefix.length, req.path.length);
+        if (rel.startsWith("/")) {
+            rel = rel.slice(1, rel.length);
+        };
+        if (rel.length == 0) {
+            return Response.status_only(0);
+        };
+
+        # Sin path traversal.
+        if (rel.contains("..")) {
+            var bad = Response(400, "400 Bad Request");
+            bad.headers["content-type"] = "text/plain; charset=utf-8";
+            return bad;
+        };
+
+        var file = me.directory + "/" + rel;
+        if (io::exists(file) == 0) {
+            return Response.not_found();
+        };
+
+        var res = Response(200, io::readText(file));
+        res.headers["content-type"] = content_type_for(file);
+        return res;
+    }
+}

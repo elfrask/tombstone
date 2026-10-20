@@ -1,0 +1,191 @@
+# tombstone/template.clsx - Plantillas/layouts configurables (meta + assets).
+#
+# `Template` arma el documento HTML completo: `<head>` con metas, title, styles
+# y scripts; `<body>` con la página que se le pase a `render(page)`.
+#
+# Herencia por composición: `Template.derive(base)` clona idioma, metas,
+# styles, scripts, etc. para que una página reutilice el base y solo
+# sobrescriba lo suyo.
+from "./view" import e, raw, render;
+
+# Meta genérica: `attr` es "name" o "property" (Open Graph), `name` la clave.
+export class MetaTag {
+    public var attr: String;
+    public var name: String;
+    public var content: String;
+
+    function main(attr: String, name: String, content: String) {
+        me.attr = attr;
+        me.name = name;
+        me.content = content;
+    }
+}
+
+# Puente explícito al renderer (dentro del método `render` llamar a `render`
+# sería ambiguo entre método y función).
+export function render_html(v: Cmx) -> String {
+    return render(v);
+}
+
+export class Template {
+    public var lang: String;
+    public var charset: String;
+    public var title: String;
+    public var description: String;
+    public var keywords: String;
+    public var author: String;
+    public var viewport: String;
+    public var favicon: String;
+    public var body_class: String;
+    public var styles: String[];
+    public var scripts: String[];
+    public var inline_style: String;
+    public var inline_script: String;
+    public var metas: MetaTag[];
+    public var head_html: String;
+
+    function main() {
+        me.lang = "es";
+        me.charset = "utf-8";
+        me.title = "";
+        me.description = "";
+        me.keywords = "";
+        me.author = "";
+        me.viewport = "width=device-width, initial-scale=1";
+        me.favicon = "";
+        me.body_class = "";
+        me.styles = [];
+        me.scripts = [];
+        me.inline_style = "";
+        me.inline_script = "";
+        me.metas = [];
+        me.head_html = "";
+    }
+
+    static function derive(parent: Template) -> Template {
+        var t = Template();
+        t.lang = parent.lang;
+        t.charset = parent.charset;
+        t.title = parent.title;
+        t.description = parent.description;
+        t.keywords = parent.keywords;
+        t.author = parent.author;
+        t.viewport = parent.viewport;
+        t.favicon = parent.favicon;
+        t.body_class = parent.body_class;
+        t.inline_style = parent.inline_style;
+        t.inline_script = parent.inline_script;
+        t.head_html = parent.head_html;
+
+        for each s in (parent.styles) {
+            t.styles.push(s);
+        };
+        for each s in (parent.scripts) {
+            t.scripts.push(s);
+        };
+        for each m in (parent.metas) {
+            t.metas.push(m);
+        };
+        return t;
+    }
+
+    # --- configuración (encadenable) --------------------------------------
+    function set_lang(v: String) -> Template { me.lang = v; return me; }
+    function set_charset(v: String) -> Template { me.charset = v; return me; }
+    function set_title(v: String) -> Template { me.title = v; return me; }
+    function set_description(v: String) -> Template { me.description = v; return me; }
+    function set_keywords(v: String) -> Template { me.keywords = v; return me; }
+    function set_author(v: String) -> Template { me.author = v; return me; }
+    function set_viewport(v: String) -> Template { me.viewport = v; return me; }
+    function set_favicon(href: String) -> Template { me.favicon = href; return me; }
+    function set_body_class(v: String) -> Template { me.body_class = v; return me; }
+    function set_inline_style(css: String) -> Template { me.inline_style = css; return me; }
+    function set_inline_script(js: String) -> Template { me.inline_script = js; return me; }
+    function set_head(html: String) -> Template { me.head_html = html; return me; }
+
+    function add_style(href: String) -> Template {
+        me.styles.push(href);
+        return me;
+    }
+
+    function add_script(src: String) -> Template {
+        me.scripts.push(src);
+        return me;
+    }
+
+    function add_meta(name: String, content: String) -> Template {
+        me.metas.push(MetaTag("name", name, content));
+        return me;
+    }
+
+    function add_meta_prop(attr: String, name: String, content: String) -> Template {
+        me.metas.push(MetaTag(attr, name, content));
+        return me;
+    }
+
+    # --- render -----------------------------------------------------------
+    function head() -> String {
+        var h = "";
+        if (me.charset.length > 0) {
+            h = h + "<meta charset=\"" + e(me.charset) + "\">";
+        };
+        if (me.viewport.length > 0) {
+            h = h + "<meta name=\"viewport\" content=\"" + e(me.viewport) + "\">";
+        };
+        if (me.description.length > 0) {
+            h = h + "<meta name=\"description\" content=\"" + e(me.description) + "\">";
+        };
+        if (me.keywords.length > 0) {
+            h = h + "<meta name=\"keywords\" content=\"" + e(me.keywords) + "\">";
+        };
+        if (me.author.length > 0) {
+            h = h + "<meta name=\"author\" content=\"" + e(me.author) + "\">";
+        };
+
+        for each m in (me.metas) {
+            h = h + "<meta " + m.attr + "=\"" + e(m.name) + "\" content=\"" + e(m.content) + "\">";
+        };
+
+        if (me.favicon.length > 0) {
+            h = h + "<link rel=\"icon\" href=\"" + e(me.favicon) + "\">";
+        };
+        if (me.title.length > 0) {
+            h = h + "<title>" + e(me.title) + "</title>";
+        };
+
+        for each s in (me.styles) {
+            h = h + "<link rel=\"stylesheet\" href=\"" + e(s) + "\">";
+        };
+        if (me.inline_style.length > 0) {
+            h = h + "<style>" + me.inline_style + "</style>";
+        };
+        if (me.head_html.length > 0) {
+            h = h + me.head_html;
+        };
+        return h;
+    }
+
+    function scripts_html() -> String {
+        var h = "";
+        for each s in (me.scripts) {
+            h = h + "<script src=\"" + e(s) + "\"></script>";
+        };
+        if (me.inline_script.length > 0) {
+            h = h + "<script>" + me.inline_script + "</script>";
+        };
+        return h;
+    }
+
+    # Documento completo: `<head>` configurado + `<body>` con `page`.
+    # Devuelve un `Cmx` centinela `raw()` (ya renderizado).
+    function render(page: Cmx) -> Cmx {
+        var body = render_html(page);
+        var bc = "";
+        if (me.body_class.length > 0) {
+            bc = " class=\"" + e(me.body_class) + "\"";
+        };
+        var doc = "<!DOCTYPE html><html lang=\"" + e(me.lang) + "\"><head>" + me.head() + "</head>";
+        doc = doc + "<body" + bc + ">" + body + me.scripts_html() + "</body></html>";
+        return raw(doc);
+    }
+}

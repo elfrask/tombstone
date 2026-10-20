@@ -1,0 +1,30 @@
+from "tombstone" import Request, contentLength;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var raw = "POST /users/42?x=1&y=two HTTP/1.1\r\nHost: example\r\nContent-Type: application/json\r\nContent-Length: 5\r\n\r\nhello";
+    var req = Request.parse(raw);
+
+    check::assertEqStr("req.method", req.http_method, "POST");
+    check::assertEqStr("req.path", req.path, "/users/42");
+    check::assertEqStr("req.version", req.version, "HTTP/1.1");
+    check::assertEqStr("req.query.x", req.query_param("x"), "1");
+    check::assertEqStr("req.query.y", req.query_param("y"), "two");
+    check::assertEqStr("req.header.case", req.header("HOST"), "example");
+    check::assertEqStr("req.header.ct", req.header("content-type"), "application/json");
+    check::assertEqStr("req.body", req.body, "hello");
+    check::assertEq("req.contentLength", contentLength(raw), 5);
+
+    var get = Request.parse("GET / HTTP/1.1\r\nHost: x\r\n\r\n");
+    check::assertEqStr("get.path", get.path, "/");
+    check::assertEqStr("get.query", get.query_string, "");
+    check::assertEqStr("get.body", get.body, "");
+    check::assertEq("get.contentLength", contentLength("GET / HTTP/1.1\r\nHost: x\r\n\r\n"), 0);
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+}

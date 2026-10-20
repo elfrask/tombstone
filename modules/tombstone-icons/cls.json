@@ -1,0 +1,8 @@
+{
+  "name": "tombstone-icons",
+  "version": "0.1.0",
+  "description": "Iconos SVG inline para Tombstone (CMX)",
+  "export": {
+    "entry": "mod.clsx"
+  }
+}

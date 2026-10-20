@@ -1,0 +1,50 @@
+# tombstone/lib.clsx - Información del sistema (pid / uptime / env).
+#
+# FFI mínima y portable; la red y el FS viven en `modules/socket` y `modules/io`.
+when (os: windows) {
+    extension "kernel32.dll" as C {
+        function GetCurrentProcessId() -> int;
+        function GetTickCount64() -> int;
+    };
+
+    extension "msvcrt.dll" as C {
+        function getenv(name: CString) -> String;
+    };
+};
+
+when (os: linux) {
+    extension "libc.so.6" as C {
+        function getpid() -> CInt;
+        function getenv(name: CString) -> String;
+    };
+};
+
+when (os: macos) {
+    extension "libSystem.B.dylib" as C {
+        function getpid() -> CInt;
+        function getenv(name: CString) -> String;
+    };
+};
+
+export function system_pid() -> int {
+    when (os: windows) {
+        return GetCurrentProcessId();
+    };
+    when (os: linux) or (os: macos) {
+        return getpid();
+    };
+    return -1;
+}
+
+# Uptime del sistema en ms (Windows). En unix devuelve 0: el reloj monotónico
+# requiere un binding del entry.
+export function system_uptime_ms() -> int {
+    when (os: windows) {
+        return GetTickCount64();
+    };
+    return 0;
+}
+
+export function system_env(name: String) -> String {
+    return getenv(name);
+}

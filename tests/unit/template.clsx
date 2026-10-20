@@ -1,0 +1,48 @@
+from "tombstone" import Template, render, raw, e, ul_items;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var t = Template();
+    t.set_lang("es");
+    t.set_title("Hola");
+    t.set_description("desc & <x>");
+    t.set_body_class("landing");
+    t.set_favicon("/public/favicon.svg");
+    t.add_style("/public/a.css");
+    t.add_script("/public/a.js");
+    t.add_meta("color-scheme", "dark");
+    t.add_meta_prop("property", "og:title", "Tombstone");
+
+    var page = (
+        <main>
+            <h1>{"T & <x>"}</h1>
+            {raw("<b>ok</b>")}
+        </main>
+    );
+    var html = render(t.render(page));
+
+    check::assertTrue("tpl.doctype", html.startsWith("<!DOCTYPE html>"));
+    check::assertTrue("tpl.lang", html.contains("<html lang=\"es\">"));
+    check::assertTrue("tpl.title", html.contains("<title>Hola</title>"));
+    check::assertTrue("tpl.desc.escape", html.contains("<meta name=\"description\" content=\"desc &amp; &lt;x&gt;\">"));
+    check::assertTrue("tpl.meta", html.contains("<meta name=\"color-scheme\" content=\"dark\">"));
+    check::assertTrue("tpl.og", html.contains("<meta property=\"og:title\" content=\"Tombstone\">"));
+    check::assertTrue("tpl.css", html.contains("<link rel=\"stylesheet\" href=\"/public/a.css\">"));
+    check::assertTrue("tpl.js", html.contains("<script src=\"/public/a.js\"></script>"));
+    check::assertTrue("tpl.favicon", html.contains("<link rel=\"icon\" href=\"/public/favicon.svg\">"));
+    check::assertTrue("tpl.body_class", html.contains("<body class=\"landing\">"));
+    check::assertTrue("tpl.escape", html.contains("<h1>T &amp; &lt;x&gt;</h1>"));
+    check::assertTrue("tpl.raw", html.contains("<b>ok</b>"));
+
+    check::assertEqStr("e.all", e("&<>\"'"), "&amp;&lt;&gt;&quot;&#39;");
+
+    var list = (<ul>{ul_items(["<x>", "y"])}</ul>);
+    check::assertEqStr("ul_items", render(list), "<ul><li>&lt;x&gt;</li><li>y</li></ul>");
+
+    if (check::fails() > 0) {
+        return 1;
+    };
+    return 0;
+}

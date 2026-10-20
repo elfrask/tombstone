@@ -1,0 +1,31 @@
+# tombstone/status.clsx - Códigos HTTP con nombre (API tipo `HttpStatus.OK`).
+from "httpd" import statusReason;
+
+export class HttpStatus {
+    static var CONTINUE = 100;
+    static var OK = 200;
+    static var CREATED = 201;
+    static var ACCEPTED = 202;
+    static var NO_CONTENT = 204;
+    static var MOVED = 301;
+    static var FOUND = 302;
+    static var SEE_OTHER = 303;
+    static var NOT_MODIFIED = 304;
+    static var TEMPORARY_REDIRECT = 307;
+    static var PERMANENT_REDIRECT = 308;
+    static var BAD_REQUEST = 400;
+    static var UNAUTHORIZED = 401;
+    static var FORBIDDEN = 403;
+    static var NOT_FOUND = 404;
+    static var METHOD_NOT_ALLOWED = 405;
+    static var CONFLICT = 409;
+    static var UNPROCESSABLE = 422;
+    static var TOO_MANY = 429;
+    static var SERVER_ERROR = 500;
+    static var BAD_GATEWAY = 502;
+    static var UNAVAILABLE = 503;
+
+    static function reason(status: int) -> String {
+        return statusReason(status);
+    }
+}
