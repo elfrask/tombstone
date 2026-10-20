@@ -30,6 +30,9 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 | `controller.clsx` | `Controller` base |
 | `model.clsx` | `Model`, `Query`, `ModelRow`, `Paginator` |
 | `database.clsx` | `Database` (driver -> Orm -> Model) |
+| `schema.clsx` | `DbSchema`, `Blueprint`, `Column` (migraciones) |
+| `migration.clsx` | `Migration`, `MigrationRunner` |
+| `factory.clsx` | `Factory` (datos para tests/seeds) |
 | `types/*.clsx` | interfaces de props CMX (una por etiqueta HTML + UI) |
 | `mod.clsx` | barrel público (motor + tipos) |
 
@@ -86,30 +89,39 @@ Reglas: `required`, `nullable`, `string`, `int`, `float`, `bool`, `email`,
 `required_if`, `starts_with`, `ends_with`, `contains`.
 También hay builder chainable: `schema({name: field().required().min(2).to_rule()})`.
 
-## Model y Database
+## Model, migraciones, relaciones y factories
 
 `Database` recibe un `orm::Driver`; `Model` es agnóstico al motor. El demo usa
-SQLite:
+SQLite y migraciones versionadas:
 
 ```clx
 import "sqlite" as sqlite;
-from "tombstone" import Database;
+from "tombstone" import Database, MigrationRunner;
 
 var db = Database(sqlite::SqliteDriver());
 db.connect(":memory:");
-db.exec("CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT)");
-var notes = db.table("notes");
+MigrationRunner(db.orm).add(CreateInitialSchema()).run();
+var notes = db.table("notes").timestamps().soft_deletes();
 var note = notes.create({title: "Hola"});
-var row = notes.find(note.get("id"));
 ```
 
-API principal: `all`, `find`, `find_or_fail`, `first`, `first_or_fail`,
-`create`, `insert`, `update`, `delete`, `destroy`, `count`, `exists`, `pluck`,
-`value`, `max/min/avg/sum`, `first_or_create`, `update_or_create`, `increment`,
-`truncate`, `paginate`, `where`, `query`; el `Query` incluye `where_eq/like/in/
-null/not_null/between`, `order_by`, `limit/offset`, `get/first/count/pluck/
-value`, agregados, `update/delete`. Relaciones/eventos/soft deletes/timestamps
-automáticos/migraciones quedan fuera de esta fase.
+`DbSchema` construye el esquema (el nombre `Schema` está reservado por la
+validación): `blueprint`, `create`, `alter`, `drop`, `has_table`,
+`has_column`; `Blueprint` expone `id`, `string/text/integer/float/boolean`,
+`timestamps`, `soft_deletes`, `foreign_id`, `index`, `unique`.
+`MigrationRunner` aplica migraciones por batch (`run`, `rollback`, `reset`,
+`status`).
+
+`Model`: `timestamps`, `soft_deletes`, `all`, `find`, `find_or_fail`, `first`,
+`first_or_fail`, `create`, `insert`, `update`, `delete`, `force_delete`,
+`restore`, `trashed`, `destroy`, `with_trashed`, `only_trashed`, `has_many`,
+`has_one`, `belongs_to`, `count`, `exists`, `pluck`, `value`, `max/min/avg/sum`,
+`first_or_create`, `update_or_create`, `increment`, `truncate`, `paginate`,
+`where`, `query`.
+`Query`: `where_eq/like/in/null/not_null/between`, `order_by`, `limit/offset`,
+`get/first/count/pluck/value`, agregados, `update/delete`, `force_delete`,
+`restore`, `with_trashed`, `only_trashed`.
+`Factory`: `make`, `create`, `create_many`.
 
 ## Uso
 

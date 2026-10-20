@@ -1,0 +1,31 @@
+# src/migrations.clsx - Esquema versionado del demo.
+from "tombstone" import Migration, DbSchema;
+
+export class CreateInitialSchema: Migration {
+    function main() {
+        super.main("2026_10_20_000001_create_initial_schema");
+    }
+
+    function up(schema: DbSchema) -> int {
+        var users = schema.blueprint("users");
+        users.id();
+        users.string("name");
+        users.string("email").unique();
+        users.timestamps();
+        schema.create(users);
+
+        var notes = schema.blueprint("notes");
+        notes.id();
+        notes.foreign_id("user_id", "users", "CASCADE").nullable();
+        notes.string("title");
+        notes.timestamps();
+        notes.soft_deletes();
+        notes.index("user_id");
+        return schema.create(notes);
+    }
+
+    function down(schema: DbSchema) -> int {
+        schema.drop("notes");
+        return schema.drop("users");
+    }
+};

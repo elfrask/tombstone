@@ -1,0 +1,284 @@
+# tombstone/schema.clsx - DbSchema builder portable (CREATE/ALTER/DROP + indices).
+#
+# El builder emite SQL estandar y delega en `orm::Orm` (SQLite en el demo).
+# No interpola valores de usuario: tablas/columnas se validan como identificadores.
+#
+#   var t = schema.blueprint("users");
+#   t.id();
+#   t.string("name");
+#   t.string("email").unique();
+#   t.timestamps();
+#   schema.create(t);
+import "orm" as orm;
+
+function require_ident(name: String, what: String) {
+    if (name.length == 0) {
+        throw("Schema: " + what + " vacio");
+    };
+    for each c in (name.toChar()) {
+        var n = ord(c);
+        if (!((n >= 65 && n <= 90) || (n >= 97 && n <= 122) ||
+              (n >= 48 && n <= 57) || n == 95)) {
+            throw("Schema: " + what + " invalido: " + name);
+        };
+    };
+}
+
+function join_sql(items: String[]) -> String {
+    var out = "";
+    for each item and i in (items) {
+        if (i > 0) { out = out + ", "; };
+        out = out + item;
+    };
+    return out;
+}
+
+function quote_default(value: String) -> String {
+    var parts = value.split("'");
+    var out = "'";
+    for each p and i in (parts) {
+        if (i > 0) { out = out + "''"; };
+        out = out + p;
+    };
+    return out + "'";
+}
+
+export class Column {
+    public var name: String;
+    public var sql_type: String;
+    public var is_primary: bool;
+    public var is_nullable: bool;
+    public var is_unique: bool;
+    public var default_sql: String;
+    public var reference_sql: String;
+
+    function main(name: String, sql_type: String) {
+        require_ident(name, "columna");
+        me.name = name;
+        me.sql_type = sql_type;
+        me.is_primary = false;
+        me.is_nullable = false;
+        me.is_unique = false;
+        me.default_sql = "";
+        me.reference_sql = "";
+    }
+
+    function nullable() -> Column {
+        me.is_nullable = true;
+        return me;
+    }
+
+    function unique() -> Column {
+        me.is_unique = true;
+        return me;
+    }
+
+    # SQL literal (se escapan comillas simples). Para defaults numericos usar
+    # "0"/"1"; SQLite aplica afinidad de columna.
+    function with_default(value: String) -> Column {
+        me.default_sql = quote_default(value);
+        return me;
+    }
+
+    function references(table: String, column: String, on_delete: String) -> Column {
+        require_ident(table, "tabla referenciada");
+        require_ident(column, "columna referenciada");
+        var action = on_delete.upper();
+        if (!(action == "CASCADE" || action == "RESTRICT" || action == "SET NULL" ||
+              action == "NO ACTION")) {
+            throw("Schema: accion FK invalida: " + on_delete);
+        };
+        me.reference_sql = "REFERENCES " + table + " (" + column + ") ON DELETE " + action;
+        return me;
+    }
+
+    function sql() -> String {
+        var out = me.name + " " + me.sql_type;
+        if (me.is_primary) {
+            out = out + " PRIMARY KEY AUTOINCREMENT";
+        };
+        if (!me.is_nullable && !me.is_primary) {
+            out = out + " NOT NULL";
+        };
+        if (me.default_sql != "") {
+            out = out + " DEFAULT " + me.default_sql;
+        };
+        if (me.is_unique) {
+            out = out + " UNIQUE";
+        };
+        if (me.reference_sql != "") {
+            out = out + " " + me.reference_sql;
+        };
+        return out;
+    }
+};
+
+export class Blueprint {
+    public var table: String;
+    public var columns: Column[];
+    public var index_sql: String[];
+
+    function main(table: String) {
+        require_ident(table, "tabla");
+        me.table = table;
+        me.columns = [];
+        me.index_sql = [];
+    }
+
+    function add_column(c: Column) -> Column {
+        me.columns.push(c);
+        return c;
+    }
+
+    function id() -> Column {
+        var c = Column("id", "INTEGER");
+        c.is_primary = true;
+        return me.add_column(c);
+    }
+
+    function string(name: String) -> Column {
+        return me.add_column(Column(name, "TEXT"));
+    }
+
+    function text(name: String) -> Column {
+        return me.add_column(Column(name, "TEXT"));
+    }
+
+    function char(name: String) -> Column {
+        return me.add_column(Column(name, "TEXT"));
+    }
+
+    function integer(name: String) -> Column {
+        return me.add_column(Column(name, "INTEGER"));
+    }
+
+    function big_integer(name: String) -> Column {
+        return me.add_column(Column(name, "INTEGER"));
+    }
+
+    function float(name: String) -> Column {
+        return me.add_column(Column(name, "REAL"));
+    }
+
+    function boolean(name: String) -> Column {
+        return me.add_column(Column(name, "INTEGER"));
+    }
+
+    function timestamp(name: String) -> Column {
+        return me.add_column(Column(name, "INTEGER"));
+    }
+
+    # created_at + updated_at (millisegundos Unix, nullable).
+    function timestamps() {
+        me.timestamp("created_at").nullable();
+        me.timestamp("updated_at").nullable();
+    }
+
+    # deleted_at (millisegundos Unix, nullable) para soft deletes.
+    function soft_deletes() {
+        me.timestamp("deleted_at").nullable();
+    }
+
+    # FK a `<table>(id)`; el llamador decide si es nullable.
+    function foreign_id(name: String, table: String, on_delete: String) -> Column {
+        var c = me.integer(name);
+        return c.references(table, "id", on_delete);
+    }
+
+    function index(column: String) -> Blueprint {
+        require_ident(column, "columna de indice");
+        me.index_sql.push(
+            "CREATE INDEX " + me.table + "_" + column + "_idx ON " +
+            me.table + " (" + column + ")"
+        );
+        return me;
+    }
+
+    function unique(column: String) -> Blueprint {
+        require_ident(column, "columna unica");
+        me.index_sql.push(
+            "CREATE UNIQUE INDEX " + me.table + "_" + column + "_uniq ON " +
+            me.table + " (" + column + ")"
+        );
+        return me;
+    }
+};
+
+export class DbSchema {
+    public var orm: orm::Orm;
+
+    function main(o: orm::Orm) {
+        me.orm = o;
+    }
+
+    function blueprint(table: String) -> Blueprint {
+        return Blueprint(table);
+    }
+
+    function create(bp: Blueprint) -> int {
+        if (me.has_table(bp.table)) {
+            throw("Schema: la tabla ya existe: " + bp.table);
+        };
+        if (bp.columns.length == 0) {
+            throw("Schema: " + bp.table + " sin columnas");
+        };
+        var defs: String[] = [];
+        for each c in (bp.columns) { defs.push(c.sql()); };
+        var rc = me.orm.exec(
+            "CREATE TABLE " + bp.table + " (" + join_sql(defs) + ")"
+        );
+        me.create_indexes(bp);
+        return rc;
+    }
+
+    # ALTER TABLE ADD COLUMN (SQLite); no modifica columnas existentes.
+    function alter(bp: Blueprint) -> int {
+        if (!me.has_table(bp.table)) {
+            throw("Schema: la tabla no existe: " + bp.table);
+        };
+        var rc = 0;
+        for each c in (bp.columns) {
+            if (c.is_primary) {
+                throw("Schema: no se puede agregar otra PK a " + bp.table);
+            };
+            rc = me.orm.exec(
+                "ALTER TABLE " + bp.table + " ADD COLUMN " + c.sql()
+            );
+        };
+        me.create_indexes(bp);
+        return rc;
+    }
+
+    function drop(table: String) -> int {
+        require_ident(table, "tabla");
+        return me.orm.dropTable(table);
+    }
+
+    function has_table(table: String) -> bool {
+        require_ident(table, "tabla");
+        var params: orm::Cell[] = [orm::cText(table)];
+        var rs = me.orm.queryBind(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+            params
+        );
+        return rs.nrows > 0;
+    }
+
+    function has_column(table: String, column: String) -> bool {
+        require_ident(table, "tabla");
+        require_ident(column, "columna");
+        var rs = me.orm.query("PRAGMA table_info(" + table + ")");
+        for (var r = 0; r < rs.nrows; r++) {
+            if (rs.getText(r, 1) == column) { return true; };
+        };
+        return false;
+    }
+
+    function create_indexes(bp: Blueprint) -> int {
+        var rc = 0;
+        for each sql in (bp.index_sql) {
+            rc = me.orm.exec(sql);
+        };
+        return rc;
+    }
+};

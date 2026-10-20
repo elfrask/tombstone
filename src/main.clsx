@@ -14,16 +14,20 @@
 #   GET  /cookies          cookies recibidas
 #   GET  /set-cookie       Set-Cookie + redirect
 #   POST /api/register     formulario/JSON validado (Controller)
-#   GET  /api/notes        conteo (Model SQLite)
-#   POST /api/notes        crea una nota desde un formulario (Model + validación)
+#   GET  /api/notes        conteo (Model SQLite, sin soft-deleted)
+#   POST /api/notes        crea una nota desde un formulario (Model + validaci�n)
+#   GET  /api/notes/trashed notas en la papelera
+#   DELETE /api/notes/{id} soft delete
+#   POST /api/notes/{id}/restore restaura una nota
 #   GET  /api/notes/{id}   nota por id (Model)
 #   GET  /public/*         archivos estáticos (fs del nodo)
 import "sqlite" as sqlite;
 from "tombstone" import App, Request, Response, CorsOptions, CookieOptions, Template;
 from "tombstone" import render, json_response, json_response_raw, json_string_array;
 from "tombstone" import parse_cookies, serialize_cookie, system_pid, system_uptime_ms;
-from "tombstone" import Database, serve;
+from "tombstone" import Database, MigrationRunner, serve;
 from "./controllers" import RegistrationController, NotesController;
+from "./migrations" import CreateInitialSchema;
 from "./views" import Landing, LandingPageProps, Gallery, GalleryPageProps;
 
 # Los shims de `fs` y `socket` se resuelven relativos al CWD: este demo se
@@ -70,8 +74,8 @@ function main(args: String[]) -> int {
 
     var db = Database(sqlite::SqliteDriver());
     db.connect(":memory:");
-    db.exec("CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL)");
-    var notes = db.table("notes");
+    MigrationRunner(db.orm).add(CreateInitialSchema()).run();
+    var notes = db.table("notes").timestamps().soft_deletes();
 
     var app = App();
     app.cors(CorsOptions());
@@ -133,6 +137,18 @@ function main(args: String[]) -> int {
         return NotesController(req, notes).store();
     });
 
+    app.get("/api/notes/trashed", (req: Request) -> Response {
+        return NotesController(req, notes).trashed();
+    });
+
+    app.delete_route("/api/notes/{id}", (req: Request) -> Response {
+        return NotesController(req, notes).destroy();
+    });
+
+    app.post("/api/notes/{id}/restore", (req: Request) -> Response {
+        return NotesController(req, notes).restore();
+    });
+
     app.get("/api/notes/{id}", (req: Request) -> Response {
         return NotesController(req, notes).show();
     });
@@ -177,6 +193,9 @@ function main(args: String[]) -> int {
         print(summary("POST /api/notes", app.handle(noteRaw)));
         print(summary("GET /api/notes/1", app.handle("GET /api/notes/1 HTTP/1.1\r\nHost: x\r\n\r\n")));
         print(summary("GET /api/notes", app.handle("GET /api/notes HTTP/1.1\r\nHost: x\r\n\r\n")));
+        print(summary("DELETE /api/notes/1", app.handle("DELETE /api/notes/1 HTTP/1.1\r\nHost: x\r\n\r\n")));
+        print(summary("GET /api/notes/trashed", app.handle("GET /api/notes/trashed HTTP/1.1\r\nHost: x\r\n\r\n")));
+        print(summary("POST /api/notes/1/restore", app.handle("POST /api/notes/1/restore HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\n\r\n")));
         print("--- fin autotest ---");
         return 0;
     };

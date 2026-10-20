@@ -1,0 +1,176 @@
+# tombstone/migration.clsx - Migraciones versionadas + runner.
+#
+#   class CreateUsers extends Migration {
+#       function main() { super.main("2026_01_01_000001_create_users"); }
+#       function up(schema: DbSchema) -> int { ... }
+#       function down(schema: DbSchema) -> int { ... }
+#   };
+#
+#   MigrationRunner(db.orm).add(CreateUsers()).run();
+import "orm" as orm;
+from "./schema" import DbSchema;
+
+function names_has(names: String[], name: String) -> bool {
+    for each n in (names) {
+        if (n == name) { return true; };
+    };
+    return false;
+}
+
+export class Migration {
+    public var migration_name: String;
+
+    function main(name: String) {
+        if (name.length == 0) { throw("Migration: nombre vacio"); };
+        me.migration_name = name;
+    }
+
+    function name() -> String { return me.migration_name; }
+
+    function up(schema: DbSchema) -> int { return 0; }
+    function down(schema: DbSchema) -> int { return 0; }
+};
+
+export class MigrationRunner {
+    public var orm: orm::Orm;
+    public var schema: DbSchema;
+    public var migrations: Migration[];
+
+    function main(o: orm::Orm) {
+        me.orm = o;
+        me.schema = DbSchema(o);
+        me.migrations = [];
+        me.ensure_table();
+    }
+
+    function add(m: Migration) -> MigrationRunner {
+        me.migrations.push(m);
+        return me;
+    }
+
+    function ensure_table() {
+        me.orm.exec(
+            "CREATE TABLE IF NOT EXISTS _migrations (" +
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+            "migration TEXT NOT NULL UNIQUE, " +
+            "batch INTEGER NOT NULL, " +
+            "ran_at INTEGER NOT NULL)"
+        );
+    }
+
+    function applied_names() -> String[] {
+        var rs = me.orm.query("SELECT migration FROM _migrations ORDER BY id");
+        var out: String[] = [];
+        for (var r = 0; r < rs.nrows; r++) {
+            out.push(rs.getText(r, 0));
+        };
+        return out;
+    }
+
+    function last_batch() -> int {
+        var rs = me.orm.query("SELECT COALESCE(MAX(batch), 0) FROM _migrations");
+        return rs.getInt(0, 0);
+    }
+
+    function names_for_batch(batch: int) -> String[] {
+        var params: orm::Cell[] = [orm::cInt(batch)];
+        var rs = me.orm.queryBind(
+            "SELECT migration FROM _migrations WHERE batch = ? ORDER BY id",
+            params
+        );
+        var out: String[] = [];
+        for (var r = 0; r < rs.nrows; r++) {
+            out.push(rs.getText(r, 0));
+        };
+        return out;
+    }
+
+    # Aplica solo las migraciones no registradas; todas en un batch nuevo.
+    function run() -> int {
+        var applied = me.applied_names();
+        var batch = me.last_batch() + 1;
+        var n = 0;
+        for each m in (me.migrations) {
+            if (names_has(applied, m.name())) { continue; };
+            me.orm.begin();
+            try {
+                m.up(me.schema);
+                var cols: String[] = ["migration", "batch", "ran_at"];
+                var cells: orm::Cell[] = [
+                    orm::cText(m.name()),
+                    orm::cInt(batch),
+                    orm::cInt(now())
+                ];
+                me.orm.insert("_migrations", cols, cells);
+                me.orm.commit();
+                n = n + 1;
+            } catch (err) {
+                me.orm.rollback();
+                throw("Migration " + m.name() + " fallo: " + str(err));
+            };
+        };
+        return n;
+    }
+
+    # Revierte el ultimo batch, en orden inverso.
+    function rollback() -> int {
+        var batch = me.last_batch();
+        if (batch == 0) { return 0; };
+        var names = me.names_for_batch(batch);
+        me.orm.begin();
+        try {
+            var i = me.migrations.length - 1;
+            var n = 0;
+            while (i >= 0) {
+                var m = me.migrations[i];
+                if (names_has(names, m.name())) {
+                    m.down(me.schema);
+                    var params: orm::Cell[] = [orm::cText(m.name())];
+                    me.orm.deleteWhere("_migrations", "migration = ?", params);
+                    n = n + 1;
+                };
+                i = i - 1;
+            };
+            me.orm.commit();
+            return n;
+        } catch (err) {
+            me.orm.rollback();
+            throw("Migration rollback fallo: " + str(err));
+        };
+    }
+
+    # Revierte todo.
+    function reset() -> int {
+        var names = me.applied_names();
+        if (names.length == 0) { return 0; };
+        me.orm.begin();
+        try {
+            var i = me.migrations.length - 1;
+            var n = 0;
+            while (i >= 0) {
+                var m = me.migrations[i];
+                if (names_has(names, m.name())) {
+                    m.down(me.schema);
+                    var params: orm::Cell[] = [orm::cText(m.name())];
+                    me.orm.deleteWhere("_migrations", "migration = ?", params);
+                    n = n + 1;
+                };
+                i = i - 1;
+            };
+            me.orm.commit();
+            return n;
+        } catch (err) {
+            me.orm.rollback();
+            throw("Migration reset fallo: " + str(err));
+        };
+    }
+
+    function status() -> String[] {
+        var rs = me.orm.query("SELECT migration, batch FROM _migrations ORDER BY id");
+        var out: String[] = [];
+        for (var r = 0; r < rs.nrows; r++) {
+            out.push(rs.getText(r, 0) + " (" + str(rs.getInt(r, 1)) + ")");
+        };
+        return out;
+    }
+};

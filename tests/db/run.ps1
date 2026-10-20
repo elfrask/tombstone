@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 $repo = (Resolve-Path (Join-Path $here "..\..\..\..")).Path
 $clx = Join-Path $repo "target\debug\clx.exe"
-$entry = Join-Path $here "model.clsx"
+$entries = @((Join-Path $here "model.clsx"), (Join-Path $here "orm.clsx"))
 
 if (-not (Test-Path $clx)) {
     Write-Host "ERROR: falta $clx (compila con: cargo build --bin clx)"
@@ -12,8 +12,11 @@ if (-not (Test-Path $clx)) {
 
 Push-Location $repo
 try {
-    & $clx run $entry
-    exit $LASTEXITCODE
+    foreach ($entry in $entries) {
+        & $clx run $entry
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    exit 0
 } finally {
     Pop-Location
 }

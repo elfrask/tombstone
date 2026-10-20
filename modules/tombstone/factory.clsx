@@ -1,0 +1,56 @@
+# tombstone/factory.clsx - Factories de datos para tests y seeds.
+#
+#   class UserFactory extends Factory {
+#       function main(users: Model) {
+#           super.main(users, (n: int) -> Record<String, String> {
+#               return {name: "User " + n.toString(),
+#                       email: "user" + n.toString() + "@example.com"};
+#           });
+#       }
+#   };
+#
+#   var u = UserFactory(users).create({name: "Ana"});
+from "./model" import Model, ModelRow;
+
+function merge_factory(
+    base: Record<String, String>, overrides: Record<String, String>
+) -> Record<String, String> {
+    var out: Record<String, String> = {};
+    var keys: String[] = base.keys();
+    for each k in (keys) { out[k] = base[k]; };
+    keys = overrides.keys();
+    for each k in (keys) { out[k] = overrides[k]; };
+    return out;
+}
+
+export class Factory {
+    public var model: Model;
+    public var definition_fn: (int) -> Record<String, String>;
+    public var sequence: int;
+
+    function main(model: Model, definition_fn: (int) -> Record<String, String>) {
+        me.model = model;
+        me.definition_fn = definition_fn;
+        me.sequence = 0;
+    }
+
+    function make(overrides: Record<String, String>) -> Record<String, String> {
+        var fn = me.definition_fn;
+        var base = fn(me.sequence);
+        me.sequence = me.sequence + 1;
+        return merge_factory(base, overrides);
+    }
+
+    function create(overrides: Record<String, String>) -> ModelRow {
+        return me.model.create(me.make(overrides));
+    }
+
+    function create_many(n: int, overrides: Record<String, String>) -> ModelRow[] {
+        var out: ModelRow[] = [];
+        if (n < 1) { return out; };
+        for (var i = 0; i < n; i++) {
+            out.push(me.create(overrides));
+        };
+        return out;
+    }
+};

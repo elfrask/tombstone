@@ -23,6 +23,10 @@ function require_ident(name: String, what: String) {
     };
 }
 
+function timestamp_now() -> String {
+    return now().toString();
+}
+
 function cell_value(c: orm::Cell) -> String {
     if (c.kind == orm::KIND_NULL) { return ""; };
     if (c.kind == orm::KIND_INT) { return str(c.i); };
@@ -88,16 +92,21 @@ export class ModelRow {
     public var primary_key: String;
     public var data: Record<String, String>;
     public var exists: bool;
+    public var has_timestamps: bool;
+    public var uses_soft_deletes: bool;
 
     function main(
         o: orm::Orm, table: String, primary_key: String,
-        data: Record<String, String>, exists: bool
+        data: Record<String, String>, exists: bool,
+        has_timestamps: bool, uses_soft_deletes: bool
     ) {
         me.orm = o;
         me.table = table;
         me.primary_key = primary_key;
         me.data = data;
         me.exists = exists;
+        me.has_timestamps = has_timestamps;
+        me.uses_soft_deletes = uses_soft_deletes;
     }
 
     function get(name: String) -> String {
@@ -122,10 +131,26 @@ export class ModelRow {
         return me.data;
     }
 
+    function trashed() -> bool {
+        if (!me.uses_soft_deletes) { return false; };
+        return me.get("deleted_at") != "";
+    }
+
     function save() -> int {
-        var pk = me.get(me.primary_key);
+        var stamp = timestamp_now();
         if (!me.exists) {
-            var id = insert_values(me.orm, me.table, me.data);
+            if (me.has_timestamps) {
+                if (!me.data.has("created_at")) { me.data["created_at"] = stamp; };
+                me.data["updated_at"] = stamp;
+            };
+            var insert_data: Record<String, String> = {};
+            var insert_keys: String[] = me.data.keys();
+            for each k in (insert_keys) {
+                if (!(me.uses_soft_deletes && k == "deleted_at" && me.data[k] == "")) {
+                    insert_data[k] = me.data[k];
+                };
+            };
+            var id = insert_values(me.orm, me.table, insert_data);
             if (!me.data.has(me.primary_key)) {
                 me.data[me.primary_key] = id.toString();
             };
@@ -136,15 +161,53 @@ export class ModelRow {
         var keys: String[] = me.data.keys();
         for each k in (keys) {
             if (k != me.primary_key) {
-                values[k] = me.data[k];
+                if (!(me.uses_soft_deletes && k == "deleted_at" && me.data[k] == "")) {
+                    values[k] = me.data[k];
+                };
             };
         };
-        return update_values(me.orm, me.table, me.primary_key, pk, values);
+        if (me.has_timestamps) {
+            values["updated_at"] = stamp;
+            me.data["updated_at"] = stamp;
+        };
+        return update_values(me.orm, me.table, me.primary_key, me.get(me.primary_key), values);
     }
 
     function delete() -> int {
         if (!me.exists) { return 0; };
+        if (!me.uses_soft_deletes) {
+            return delete_id(me.orm, me.table, me.primary_key, me.get(me.primary_key));
+        };
+        var stamp = timestamp_now();
+        var values: Record<String, String> = {deleted_at: stamp};
+        if (me.has_timestamps) {
+            values["updated_at"] = stamp;
+            me.data["updated_at"] = stamp;
+        };
+        me.data["deleted_at"] = stamp;
+        return update_values(me.orm, me.table, me.primary_key, me.get(me.primary_key), values);
+    }
+
+    function force_delete() -> int {
+        if (!me.exists) { return 0; };
         return delete_id(me.orm, me.table, me.primary_key, me.get(me.primary_key));
+    }
+
+    function restore() -> int {
+        if (!me.exists || !me.uses_soft_deletes) { return 0; };
+        var sql = "UPDATE " + me.table + " SET deleted_at = NULL";
+        var cells: orm::Cell[] = [];
+        if (me.has_timestamps) {
+            var stamp = timestamp_now();
+            sql = sql + ", updated_at = ?";
+            cells.push(orm::cText(stamp));
+            me.data["updated_at"] = stamp;
+        };
+        sql = sql + " WHERE " + me.primary_key + " = ?";
+        cells.push(value_cell(me.get(me.primary_key)));
+        var n = me.orm.runDml(sql, cells);
+        me.data["deleted_at"] = "";
+        return n;
     }
 };
 
@@ -157,6 +220,10 @@ export class Query {
     public var order_sql: String;
     public var limit_n: int;
     public var offset_n: int;
+    public var has_timestamps: bool;
+    public var uses_soft_deletes: bool;
+    public var include_trashed_flag: bool;
+    public var only_trashed_flag: bool;
 
     function main(o: orm::Orm, table: String, primary_key: String) {
         me.orm = o;
@@ -167,6 +234,22 @@ export class Query {
         me.order_sql = "";
         me.limit_n = -1;
         me.offset_n = 0;
+        me.has_timestamps = false;
+        me.uses_soft_deletes = false;
+        me.include_trashed_flag = false;
+        me.only_trashed_flag = false;
+    }
+
+    function with_trashed() -> Query {
+        me.include_trashed_flag = true;
+        me.only_trashed_flag = false;
+        return me;
+    }
+
+    function only_trashed() -> Query {
+        me.only_trashed_flag = true;
+        me.include_trashed_flag = false;
+        return me;
     }
 
     function where(column: String, operator: String, value: String) -> Query {
@@ -239,13 +322,29 @@ export class Query {
     function skip(n: int) -> Query { return me.offset(n); }
 
     function where_sql() -> String {
-        if (me.wheres.length == 0) { return "1 = 1"; };
+        var clauses: String[] = [];
+        for each w in (me.wheres) { clauses.push(w); };
+        if (me.uses_soft_deletes) {
+            if (me.only_trashed_flag) {
+                clauses.push("deleted_at IS NOT NULL");
+            } elif (!me.include_trashed_flag) {
+                clauses.push("deleted_at IS NULL");
+            };
+        };
+        if (clauses.length == 0) { return "1 = 1"; };
         var out = "";
-        for each w and i in (me.wheres) {
+        for each w and i in (clauses) {
             if (i > 0) { out = out + " AND "; };
             out = out + w;
         };
         return out;
+    }
+
+    function make_row(data: Record<String, String>, exists: bool) -> ModelRow {
+        return ModelRow(
+            me.orm, me.table, me.primary_key, data, exists,
+            me.has_timestamps, me.uses_soft_deletes
+        );
     }
 
     function select() -> orm::ResultSet {
@@ -263,7 +362,7 @@ export class Query {
             for each col and c in (rs.cols) {
                 data[col] = cell_value(rs.at(r, c));
             };
-            rows.push(ModelRow(me.orm, me.table, me.primary_key, data, true));
+            rows.push(me.make_row(data, true));
         };
         return rows;
     }
@@ -272,7 +371,7 @@ export class Query {
         me.limit_n = 1;
         var rows = me.get();
         if (rows.length == 0) {
-            return ModelRow(me.orm, me.table, me.primary_key, {}, false);
+            return me.make_row({}, false);
         };
         return rows[0];
     }
@@ -324,7 +423,10 @@ export class Query {
 
     function update(values: Record<String, String>) -> int {
         if (me.wheres.length == 0) {
-            throw("Model: update sin WHERE (usá truncate/delete explícito)");
+            throw("Model: update sin WHERE (usar truncate/delete explicito)");
+        };
+        if (me.has_timestamps && !values.has("updated_at")) {
+            values["updated_at"] = timestamp_now();
         };
         var cols: String[] = [];
         var cells: orm::Cell[] = [];
@@ -342,7 +444,33 @@ export class Query {
         if (me.wheres.length == 0) {
             throw("Model: delete sin WHERE");
         };
+        if (me.uses_soft_deletes) {
+            var values: Record<String, String> = {deleted_at: timestamp_now()};
+            return me.update(values);
+        };
         return me.orm.deleteWhere(me.table, me.where_sql(), me.params);
+    }
+
+    function force_delete() -> int {
+        if (me.wheres.length == 0) {
+            throw("Model: force_delete sin WHERE");
+        };
+        return me.orm.deleteWhere(me.table, me.where_sql(), me.params);
+    }
+
+    function restore() -> int {
+        if (!me.uses_soft_deletes) { return 0; };
+        me.only_trashed_flag = true;
+        me.include_trashed_flag = false;
+        var sql = "UPDATE " + me.table + " SET deleted_at = NULL";
+        var cells: orm::Cell[] = [];
+        if (me.has_timestamps) {
+            sql = sql + ", updated_at = ?";
+            cells.push(orm::cText(timestamp_now()));
+        };
+        sql = sql + " WHERE " + me.where_sql();
+        var params: orm::Cell[] = [...cells, ...me.params];
+        return me.orm.runDml(sql, params);
     }
 };
 
@@ -377,6 +505,8 @@ export class Model {
     public var orm: orm::Orm;
     public var table: String;
     public var primary_key: String;
+    public var has_timestamps: bool;
+    public var uses_soft_deletes: bool;
 
     function main(o: orm::Orm, table: String, primary_key: String) {
         require_ident(table, "tabla");
@@ -384,9 +514,29 @@ export class Model {
         me.orm = o;
         me.table = table;
         me.primary_key = primary_key;
+        me.has_timestamps = false;
+        me.uses_soft_deletes = false;
     }
 
-    function query() -> Query { return Query(me.orm, me.table, me.primary_key); }
+    function timestamps() -> Model {
+        me.has_timestamps = true;
+        return me;
+    }
+
+    function soft_deletes() -> Model {
+        me.uses_soft_deletes = true;
+        return me;
+    }
+
+    function query() -> Query {
+        var q = Query(me.orm, me.table, me.primary_key);
+        q.has_timestamps = me.has_timestamps;
+        q.uses_soft_deletes = me.uses_soft_deletes;
+        return q;
+    }
+
+    function with_trashed() -> Query { return me.query().with_trashed(); }
+    function only_trashed() -> Query { return me.query().only_trashed(); }
     function where(column: String, operator: String, value: String) -> Query {
         return me.query().where(column, operator, value);
     }
@@ -425,13 +575,21 @@ export class Model {
     }
 
     function create(values: Record<String, String>) -> ModelRow {
+        if (me.has_timestamps) {
+            var stamp = timestamp_now();
+            if (!values.has("created_at")) { values["created_at"] = stamp; };
+            values["updated_at"] = stamp;
+        };
         var id = insert_values(me.orm, me.table, values);
         if (!values.has(me.primary_key)) {
             values[me.primary_key] = id.toString();
         };
         var row = me.find(values[me.primary_key]);
         if (!row.exists) {
-            return ModelRow(me.orm, me.table, me.primary_key, values, true);
+            return ModelRow(
+                me.orm, me.table, me.primary_key, values, true,
+                me.has_timestamps, me.uses_soft_deletes
+            );
         };
         return row;
     }
@@ -448,6 +606,48 @@ export class Model {
         var n = 0;
         for each id in (ids) { n = n + me.delete(id); };
         return n;
+    }
+
+    function force_delete(id: String) -> int {
+        return me.query().with_trashed().where(me.primary_key, "=", id).force_delete();
+    }
+
+    function restore(id: String) -> int {
+        if (!me.uses_soft_deletes) { return 0; };
+        return me.query().only_trashed().where(me.primary_key, "=", id).restore();
+    }
+
+    function trashed(id: String) -> bool {
+        if (!me.uses_soft_deletes) { return false; };
+        return me.query().with_trashed().where(me.primary_key, "=", id).first().trashed();
+    }
+
+    # Relaciones: el caller pasa el id del padre (has_many/has_one) o del hijo
+    # (belongs_to). Devuelven un Query/Row del modelo relacionado.
+    function has_many(related: Model, foreign_key: String, parent_id: String) -> Query {
+        require_ident(foreign_key, "foreign key");
+        return related.query().where(foreign_key, "=", parent_id);
+    }
+
+    function has_one(related: Model, foreign_key: String, parent_id: String) -> ModelRow {
+        return me.has_many(related, foreign_key, parent_id).first();
+    }
+
+    function belongs_to(related: Model, foreign_key: String, child_id: String) -> ModelRow {
+        require_ident(foreign_key, "foreign key");
+        var child = me.find(child_id);
+        if (!child.exists) { return related.find(""); };
+        return related.find(child.get(foreign_key));
+    }
+
+    function hasMany(related: Model, foreign_key: String, parent_id: String) -> Query {
+        return me.has_many(related, foreign_key, parent_id);
+    }
+    function hasOne(related: Model, foreign_key: String, parent_id: String) -> ModelRow {
+        return me.has_one(related, foreign_key, parent_id);
+    }
+    function belongsTo(related: Model, foreign_key: String, child_id: String) -> ModelRow {
+        return me.belongs_to(related, foreign_key, child_id);
     }
 
     function count() -> int { return me.query().count(); }
@@ -486,9 +686,17 @@ export class Model {
 
     function increment(id: String, column: String, amount: int) -> int {
         require_ident(column, "columna");
-        var sql = "UPDATE " + me.table + " SET " + column + " = " + column +
-                  " + ? WHERE " + me.primary_key + " = ?";
-        var cells: orm::Cell[] = [orm::cInt(amount), value_cell(id)];
+        var sql = "UPDATE " + me.table + " SET " + column + " = " + column + " + ?";
+        var cells: orm::Cell[] = [orm::cInt(amount)];
+        if (me.has_timestamps) {
+            sql = sql + ", updated_at = ?";
+            cells.push(orm::cText(timestamp_now()));
+        };
+        sql = sql + " WHERE " + me.primary_key + " = ?";
+        if (me.uses_soft_deletes) {
+            sql = sql + " AND deleted_at IS NULL";
+        };
+        cells.push(value_cell(id));
         return me.orm.runDml(sql, cells);
     }
 

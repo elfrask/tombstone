@@ -22,6 +22,8 @@ Fase 0 completa y ampliada:
 - Formularios: urlencoded, multipart (campos + `FormFile`) y JSON en `Request`.
 - Validación de request: reglas pipe + builder `field()/schema()`; `Controller`.
 - Model: `Model/Query/ModelRow` sobre `modules/orm`; SQLite en el demo.
+- ORM de aplicación: migraciones (`MigrationRunner` + `DbSchema`), relaciones
+  (`has_many`/`has_one`/`belongs_to`), timestamps, soft deletes y factories.
 - Demo: landing real con CMX, iconos, CSS/JS, API JSON, formulario y notas.
 
 ## Estructura
@@ -47,15 +49,20 @@ tombstone/
 │   │   ├── controller.clsx  # Controller base (request/validación/respuestas)
 │   │   ├── model.clsx       # Model/Query/ModelRow (Active Record)
 │   │   ├── database.clsx    # Database (driver -> Orm -> Model)
+│   │   ├── schema.clsx      # DbSchema/Blueprint/Column (migraciones)
+│   │   ├── migration.clsx   # Migration + MigrationRunner
+│   │   ├── factory.clsx     # Factory (datos para tests/seeds)
 │   │   └── types/           # interfaces de props CMX (HTML + UI)
 │   └── tombstone-icons/     # iconos SVG para las vistas
 ├── src/
 │   ├── main.clsx            # proyecto demo (rutas + Template)
 │   ├── components.clsx      # componentes CMX (funciones -> Cmx)
 │   ├── controllers.clsx     # RegistrationController / NotesController
+│   ├── migrations.clsx      # esquema versionado del demo
 │   └── views.clsx           # páginas (Landing, Gallery) con <Componente />
 ├── public/                  # css / js / favicon servidos por /public
 ├── tests/unit/              # tests in-memory (clx test)
+├── tests/db/                # Model + migraciones/relaciones/soft deletes
 └── tests/integration/       # servidor real + curl
 ```
 
@@ -95,8 +102,11 @@ Rutas del demo:
 | GET | `/users/{id}` | JSON con el param |
 | POST | `/api/echo` | JSON con el body recibido |
 | POST | `/api/register` | formulario/JSON validado (Controller + `validate`) |
-| GET | `/api/notes` | conteo de notas (Model) |
+| GET | `/api/notes` | conteo de notas (Model, sin soft-deleted) |
 | POST | `/api/notes` | crea nota desde formulario (Model) |
+| GET | `/api/notes/trashed` | conteo de notas en la papelera |
+| DELETE | `/api/notes/{id}` | soft delete |
+| POST | `/api/notes/{id}/restore` | restaura una nota |
 | GET | `/api/notes/{id}` | nota por id (Model) |
 | GET | `/cookies` | cookies recibidas |
 | GET | `/set-cookie` | `Set-Cookie` + redirect |
@@ -134,8 +144,10 @@ powershell -File cls-repositories\tombstone\tests\db\run.ps1
 
 Cobertura actual: **9 tests unitarios PASS** (request/response/router/app,
 template, view, types, validation/form/multipart, cookies/CORS/JSON/static,
-status) y **46 checks de integración PASS** (landing, UI kit, API, formulario
-validado, Model SQLite, cookies, CORS, static, 404/405).
+status), **56 checks DB PASS** (Model CRUD + migraciones, relaciones,
+timestamps, soft deletes y factories) y **56 checks de integraci�n PASS**
+(landing, UI kit, API, formulario validado, Model SQLite + soft delete/restore,
+cookies, CORS, static, 404/405).
 
 ## Uso del framework
 
@@ -266,8 +278,9 @@ El motor es agnóstico al driver; el demo usa `modules/sqlite`:
 import "sqlite" as sqlite;
 var db = Database(sqlite::SqliteDriver());
 db.connect(":memory:");
-db.exec("CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT)");
-var notes = db.table("notes");
+MigrationRunner(db.orm).add(CreateInitialSchema()).run();
+var users = db.table("users").timestamps();
+var notes = db.table("notes").timestamps().soft_deletes();
 
 var note = notes.create({title: "Hola"});
 var row = notes.find(note.get("id"));
@@ -276,19 +289,90 @@ row.save();
 var page = notes.paginate(1, 10);
 ```
 
-`Model`: `all`, `all_ordered`, `find`, `find_or_fail`, `find_many`, `first`,
-`first_or_fail`, `first_where`, `create`, `insert`, `update`, `delete`,
-`destroy`, `count`, `exists`, `pluck`, `value`, `max/min/avg/sum`,
-`first_or_create`, `update_or_create`, `increment`, `truncate`, `paginate`,
-`where`, `query`.
+`Model`: `timestamps`, `soft_deletes`, `all`, `all_ordered`, `find`,
+`find_or_fail`, `find_many`, `first`, `first_or_fail`, `first_where`, `create`,
+`insert`, `update`, `delete`, `force_delete`, `restore`, `trashed`, `destroy`,
+`with_trashed`, `only_trashed`, `has_many`/`hasMany`, `has_one`/`hasOne`, `belongs_to`/`belongsTo`, `count`,
+`exists`, `pluck`, `value`, `max/min/avg/sum`, `first_or_create`,
+`update_or_create`, `increment`, `truncate`, `paginate`, `where`, `query`.
 `Query`: `where`, `where_eq/like/in/null/not_null/between`, `order_by`,
 `latest/oldest`, `limit/offset/take/skip`, `get`, `first`, `count`, `exists`,
-`pluck`, `value`, `sum/max/min/avg`, `update`, `delete`.
+`pluck`, `value`, `sum/max/min/avg`, `update`, `delete`, `force_delete`,
+`restore`, `with_trashed`, `only_trashed`.
 `ModelRow`: `get/get_str/get_int/get_float/get_bool`, `set`, `fill`,
-`to_record`, `save`, `delete`.
+`to_record`, `save`, `delete`, `force_delete`, `restore`, `trashed`.
 
-> Cobertura del núcleo de Active Record. Relaciones, eventos, timestamps
-> automáticos, soft deletes y migraciones quedan fuera de esta fase.
+### Migraciones y schema
+
+`DbSchema` es el builder portable (el nombre `Schema` ya lo usa la validación):
+
+```clx
+from "tombstone" import Migration, MigrationRunner, DbSchema;
+
+class CreateUsers: Migration {
+    function main() { super.main("2026_01_01_000001_create_users"); }
+    function up(schema: DbSchema) -> int {
+        var t = schema.blueprint("users");
+        t.id();
+        t.string("email").unique();
+        t.timestamps();
+        return schema.create(t);
+    }
+    function down(schema: DbSchema) -> int { return schema.drop("users"); }
+};
+
+MigrationRunner(db.orm).add(CreateUsers()).run();
+```
+
+- `DbSchema`: `blueprint`, `create`, `alter` (ADD COLUMN), `drop`,
+  `has_table`, `has_column`.
+- `Blueprint`: `id`, `string/text/char/integer/big_integer/float/boolean`,
+  `timestamp`, `timestamps`, `soft_deletes`, `foreign_id`, `index`, `unique`.
+- `Column`: `nullable`, `unique`, `with_default`, `references`.
+- `MigrationRunner`: `add`, `run` (idempotente, un batch nuevo), `rollback`
+  (último batch), `reset`, `status`.
+
+### Relaciones, timestamps y soft deletes
+
+```clx
+var ana = users.create({name: "Ana", email: "ana@example.com"});
+var n1 = notes.create({user_id: ana.get("id"), title: "Primera"});
+
+users.has_many(notes, "user_id", ana.get("id")).get();
+users.has_one(notes, "user_id", ana.get("id"));
+notes.belongs_to(users, "user_id", n1.get("id"));
+
+notes.delete(n1.get("id"));           # soft delete si soft_deletes()
+notes.with_trashed().count();         # incluye papelera
+notes.only_trashed().get();
+notes.restore(n1.get("id"));
+notes.force_delete(n1.get("id"));     # borrado físico
+```
+
+`timestamps()` escribe `created_at`/`updated_at` en milisegundos Unix;
+`soft_deletes()` usa `deleted_at` y filtra por defecto en `Model`/`Query`.
+
+### Factories
+
+```clx
+function user_definition(n: int) -> Record<String, String> {
+    var r: Record<String, String> = {
+        name: "User " + n.toString(),
+        email: "u" + n.toString() + "@test.local"
+    };
+    return r;
+}
+
+class UserFactory: Factory {
+    function main(users: Model) { super.main(users, user_definition); }
+};
+
+var ana = UserFactory(users).create({name: "Ana"});
+var many = UserFactory(users).create_many(3, {});
+```
+
+`Factory.make` mezcla la definición con overrides y avanza una secuencia;
+`create` persiste y `create_many` crea N filas.
 
 ### API
 
@@ -303,9 +387,15 @@ var page = notes.paginate(1, 10);
   `field()`/`schema()` para armar reglas; `validate_data(data, rules)`.
 - `Controller`: `input/all/param/file`, `validate`, `validate_schema`,
   `json/ok/created/accepted/no_content/invalid/error/redirect`.
-- `Database`: `connect/close/exec/query/begin/commit/rollback/table`.
-- `Model`: ver sección Model (`all`, `find`, `create`, `update`, `delete`,
+- `Database`: `connect/close/exec/query/begin/commit/rollback/table`,
+  `table_with_key`, `schema`.
+- `Model`: ver secci�n Model (`all`, `find`, `create`, `update`, `delete`,
+  `force_delete`, `restore`, `with_trashed`, `only_trashed`, relaciones,
   `where`, `paginate`, agregados, ...); `ModelRow`/`Query`/`Paginator`.
+- `DbSchema`/`Blueprint`/`Column`: schema builder y migraciones.
+- `Migration`/`MigrationRunner`: migraciones versionadas (`run`, `rollback`,
+  `reset`, `status`).
+- `Factory`: `make`, `create`, `create_many`.
 - `Response`: `text`, `html`, `json_raw`, `json_response`, `redirect`,
   `status_only`, `not_found`, `header`, `set_cookie`, `serialize`.
 - `Template`: `set_*`, `add_style`, `add_script`, `add_meta`,

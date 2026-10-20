@@ -1,0 +1,121 @@
+# tests/db/orm.clsx - Migraciones, relaciones, timestamps, soft deletes y factories.
+import "sqlite" as sqlite;
+import "check" as check;
+from "tombstone" import Database, Migration, MigrationRunner, DbSchema, Model, Factory;
+
+class CreateUsers: Migration {
+    function main() { super.main("001_create_users"); }
+    function up(schema: DbSchema) -> int {
+        var t = schema.blueprint("users");
+        t.id();
+        t.string("name");
+        t.string("email").unique();
+        t.boolean("active").with_default("1");
+        t.timestamps();
+        return schema.create(t);
+    }
+    function down(schema: DbSchema) -> int { return schema.drop("users"); }
+};
+
+class CreateNotes: Migration {
+    function main() { super.main("002_create_notes"); }
+    function up(schema: DbSchema) -> int {
+        var t = schema.blueprint("notes");
+        t.id();
+        t.foreign_id("user_id", "users", "CASCADE").nullable();
+        t.string("title");
+        t.timestamps();
+        t.soft_deletes();
+        t.index("user_id");
+        return schema.create(t);
+    }
+    function down(schema: DbSchema) -> int { return schema.drop("notes"); }
+};
+
+function user_definition(n: int) -> Record<String, String> {
+    var r: Record<String, String> = {
+        name: "User " + n.toString(),
+        email: "u" + n.toString() + "@test.local"
+    };
+    return r;
+}
+
+class UserFactory: Factory {
+    function main(users: Model) { super.main(users, user_definition); }
+};
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var db = Database(sqlite::SqliteDriver());
+    db.connect(":memory:");
+    var runner = MigrationRunner(db.orm);
+    runner.add(CreateUsers()).add(CreateNotes());
+
+    check::assertEq("migration.run", runner.run(), 2);
+    check::assertEq("migration.run.idempotent", runner.run(), 0);
+    check::assertEq("migration.status", runner.status().length, 2);
+    check::assertTrue("schema.users", db.schema().has_table("users"));
+    check::assertTrue("schema.notes", db.schema().has_table("notes"));
+    check::assertTrue("schema.user_id", db.schema().has_column("notes", "user_id"));
+
+    var users = db.table("users").timestamps();
+    var notes = db.table("notes").timestamps().soft_deletes();
+    var factory = UserFactory(users);
+    var ana = factory.create({name: "Ana"});
+    var beto = factory.create({});
+    check::assertTrue("factory.created", ana.exists);
+    check::assertEqStr("factory.override", ana.get_str("name"), "Ana");
+    check::assertEqStr("factory.sequence", beto.get_str("email"), "u1@test.local");
+    check::assertTrue("factory.default", ana.get_bool("active"));
+    check::assertTrue("timestamp.created", ana.get("created_at") != "");
+    check::assertTrue("timestamp.updated", ana.get("updated_at") != "");
+
+    var n1 = notes.create({user_id: ana.get("id"), title: "Primera"});
+    var n2 = notes.create({user_id: ana.get("id"), title: "Segunda"});
+    notes.create({user_id: beto.get("id"), title: "Tercera"});
+    check::assertTrue("timestamp.note", n1.get("created_at") != "");
+    check::assertEq("relation.has_many", users.has_many(notes, "user_id", ana.get("id")).count(), 2);
+    check::assertEqStr("relation.has_one", users.has_one(notes, "user_id", ana.get("id")).get_str("title"), "Primera");
+    check::assertEqStr("relation.belongs_to", notes.belongs_to(users, "user_id", n1.get("id")).get_str("name"), "Ana");
+    check::assertEqStr("relation.belongs_to.missing", notes.belongs_to(users, "user_id", "999").get_str("name"), "");
+
+    notes.update(n2.get("id"), {title: "Editada"});
+    check::assertEqStr("model.update", notes.find(n2.get("id")).get_str("title"), "Editada");
+    var edit = notes.find(n2.get("id"));
+    edit.set("title", "Segunda editada");
+    edit.save();
+    check::assertEqStr("model.row.save", notes.find(n2.get("id")).get_str("title"), "Segunda editada");
+
+    check::assertEq("soft.delete", notes.delete(n1.get("id")), 1);
+    check::assertEq("soft.count", notes.count(), 2);
+    check::assertEq("soft.with_trashed", notes.with_trashed().count(), 3);
+    check::assertEq("soft.only_trashed", notes.only_trashed().count(), 1);
+    check::assertTrue("soft.find.hidden", !notes.find(n1.get("id")).exists);
+    check::assertTrue("soft.trashed", notes.trashed(n1.get("id")));
+    check::assertEq("soft.relation", users.has_many(notes, "user_id", ana.get("id")).count(), 1);
+    check::assertEq("soft.relation.trashed", users.has_many(notes, "user_id", ana.get("id")).with_trashed().count(), 2);
+
+    check::assertEq("soft.restore", notes.restore(n1.get("id")), 1);
+    check::assertEq("soft.restore.count", notes.count(), 3);
+    check::assertTrue("soft.restore.visible", notes.find(n1.get("id")).exists);
+    check::assertTrue("soft.restore.flag", !notes.trashed(n1.get("id")));
+
+    check::assertEq("soft.force_delete", notes.force_delete(n1.get("id")), 1);
+    check::assertEq("soft.force.total", notes.with_trashed().count(), 2);
+    check::assertEq("soft.delete.missing", notes.delete(n1.get("id")), 0);
+
+    var alter = db.schema().blueprint("notes");
+    alter.string("body").nullable();
+    db.schema().alter(alter);
+    check::assertTrue("schema.alter", db.schema().has_column("notes", "body"));
+
+    check::assertEq("migration.rollback", runner.rollback(), 2);
+    check::assertTrue("migration.dropped.notes", !db.schema().has_table("notes"));
+    check::assertTrue("migration.dropped.users", !db.schema().has_table("users"));
+    check::assertEq("migration.rerun", runner.run(), 2);
+
+    db.close();
+    if (check::fails() > 0) { return 1; };
+    return 0;
+};

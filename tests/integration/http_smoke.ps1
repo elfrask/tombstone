@@ -142,6 +142,7 @@ try {
         $r = CurlRaw "POST" "/api/notes" "title=Hola" @("Content-Type: application/x-www-form-urlencoded")
         Check "POST /api/notes status" ($r -match "HTTP/1\.1 201 Created") $r
         Check "POST /api/notes title" ($r -match '"title":"Hola"') $r
+        Check "POST /api/notes timestamp" ($r -match '"created_at":"[0-9]+"') $r
         $noteId = [regex]::Match($r, '"id":"?([0-9]+)"?').Groups[1].Value
         if ($noteId -eq "") { $noteId = "1" }
 
@@ -151,6 +152,27 @@ try {
 
         $r = CurlRaw "GET" "/api/notes" $null $null
         Check "GET /api/notes count" ($r -match '"count":1') $r
+
+        $r = CurlRaw "DELETE" "/api/notes/$noteId" $null $null
+        Check "DELETE /api/notes status" ($r -match "HTTP/1\.1 200 OK") $r
+        Check "DELETE /api/notes body" ($r -match '"deleted":true') $r
+
+        $r = CurlRaw "GET" "/api/notes/$noteId" $null $null
+        Check "GET /api/notes deleted 404" ($r -match "HTTP/1\.1 404 Not Found") $r
+
+        $r = CurlRaw "GET" "/api/notes" $null $null
+        Check "GET /api/notes soft count" ($r -match '"count":0') $r
+
+        $r = CurlRaw "GET" "/api/notes/trashed" $null $null
+        Check "GET /api/notes/trashed status" ($r -match "HTTP/1\.1 200 OK") $r
+        Check "GET /api/notes/trashed count" ($r -match '"count":1') $r
+
+        $r = CurlRaw "POST" "/api/notes/$noteId/restore" $null $null
+        Check "POST /api/notes/restore status" ($r -match "HTTP/1\.1 200 OK") $r
+        Check "POST /api/notes/restore body" ($r -match '"restored":true') $r
+
+        $r = CurlRaw "GET" "/api/notes" $null $null
+        Check "GET /api/notes restored count" ($r -match '"count":1') $r
 
         $r = CurlRaw "GET" "/cookies" $null @("Cookie: a=1; b=two")
         Check "GET /cookies status" ($r -match "HTTP/1\.1 200 OK") $r

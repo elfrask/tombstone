@@ -9,6 +9,7 @@
 #   var users = db.table("users");
 import "orm" as orm;
 from "./model" import Model;
+from "./schema" import DbSchema;
 
 export class Database {
     public var driver: orm::Driver;
@@ -35,4 +36,7 @@ export class Database {
         return Model(me.orm, name, primary_key);
     }
 
+    function schema() -> DbSchema {
+        return DbSchema(me.orm);
+    }
 };
