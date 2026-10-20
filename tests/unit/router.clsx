@@ -1,4 +1,4 @@
-from "tombstone" import Router, Request, Response, route_matches;
+from "tombstone" import Router, RouteGroup, Request, Response, route_matches;
 import "check" as check;
 
 function main(args: String[]) -> int {
@@ -32,6 +32,19 @@ function main(args: String[]) -> int {
 
     var missing = r.dispatch(Request.parse("GET /nope HTTP/1.1\r\nHost: x\r\n\r\n"));
     check::assertEq("router.404", missing.status, 404);
+
+    var groupedRouter = Router();
+    var api = RouteGroup(groupedRouter, "/api", []);
+    api.use("guard", (req: Request) -> Response {
+        if (req.header("x-block") == "1") { return Response.status_only(403); };
+        return Response.status_only(0);
+    });
+    api.get("/ping", (req: Request) -> Response { return Response.text("pong"); });
+    var grouped = groupedRouter.dispatch(Request.parse("GET /api/ping HTTP/1.1\r\nHost: x\r\n\r\n"));
+    check::assertEq("router.group.status", grouped.status, 200);
+    check::assertEqStr("router.group.body", grouped.body, "pong");
+    var blocked = groupedRouter.dispatch(Request.parse("GET /api/ping HTTP/1.1\r\nHost: x\r\nx-block: 1\r\n\r\n"));
+    check::assertEq("router.group.middleware", blocked.status, 403);
 
     if (check::fails() > 0) {
         return 1;

@@ -1,10 +1,11 @@
 # src/controllers.clsx - Controladores del proyecto demo.
 #
-# El controller valida y mapea a DTOs; delega en Actions/Repository.
-from "tombstone" import Controller, ModelRow, Request, Response;
+# El controller valida y mapea a DTOs; delega en Actions/Repository/Resource.
+from "tombstone" import Controller, Request, Response;
 from "./actions" import CreateNoteAction, DeleteNoteAction, RestoreNoteAction;
 from "./dtos" import NoteInput, RegisterUserInput;
 from "./repositories" import NoteRepository;
+from "./resources" import NoteResource;
 
 export class RegistrationController: Controller {
     function main(req: Request) {
@@ -33,19 +34,22 @@ export class NotesController: Controller {
     public var create_note: CreateNoteAction;
     public var delete_note: DeleteNoteAction;
     public var restore_note: RestoreNoteAction;
+    public var note_resource: NoteResource;
 
     function main(
         req: Request,
         notes: NoteRepository,
         create_note: CreateNoteAction,
         delete_note: DeleteNoteAction,
-        restore_note: RestoreNoteAction
+        restore_note: RestoreNoteAction,
+        note_resource: NoteResource
     ) {
         super.main(req);
         me.notes = notes;
         me.create_note = create_note;
         me.delete_note = delete_note;
         me.restore_note = restore_note;
+        me.note_resource = note_resource;
     }
 
     function index() -> Response {
@@ -62,11 +66,7 @@ export class NotesController: Controller {
             return me.invalid(v);
         };
         var row = me.create_note.handle(NoteInput(v.data["title"]));
-        return me.created({
-            id: row.get("id"),
-            title: row.get_str("title"),
-            created_at: row.get("created_at")
-        });
+        return me.created(me.note_resource.to_record(row));
     }
 
     function show() -> Response {
@@ -74,11 +74,7 @@ export class NotesController: Controller {
         if (!row.exists) {
             return me.not_found();
         };
-        return me.ok({
-            id: row.get("id"),
-            title: row.get_str("title"),
-            created_at: row.get("created_at")
-        });
+        return me.ok(me.note_resource.to_record(row));
     }
 
     function destroy() -> Response {

@@ -1,0 +1,14 @@
+# tombstone/resource.clsx - Presentación de ModelRow para respuestas JSON.
+from "./model" import ModelRow;
+
+export class Resource {
+    function to_record(row: ModelRow) -> Record<String, String> {
+        return row.to_record();
+    }
+
+    function collection(rows: ModelRow[]) -> Record<String, String>[] {
+        var out: Record<String, String>[] = [];
+        for each row in (rows) { out.push(me.to_record(row)); };
+        return out;
+    }
+};

@@ -1,0 +1,39 @@
+# tombstone/group.clsx - Grupos de rutas con prefijo y middleware compartido.
+from "httpd" import Request, Response;
+from "./router" import Router;
+from "./middleware" import Middleware;
+
+export class RouteGroup {
+    public var router: Router;
+    public var prefix: String;
+    public var middlewares: Middleware[];
+
+    function main(router: Router, prefix: String, middlewares: Middleware[]) {
+        me.router = router;
+        me.prefix = prefix;
+        me.middlewares = [];
+        for each mw in (middlewares) { me.middlewares.push(mw); };
+    }
+
+    function use(mw_name: String, handler: (Request) -> Response) -> RouteGroup {
+        me.middlewares.push(Middleware(mw_name, handler));
+        return me;
+    }
+
+    function add(http_method: String, pattern: String, handler: (Request) -> Response) {
+        me.router.add_with_middleware(
+            http_method, me.prefix + pattern, handler, me.middlewares
+        );
+    }
+
+    function get(pattern: String, handler: (Request) -> Response) { me.add("GET", pattern, handler); }
+    function post(pattern: String, handler: (Request) -> Response) { me.add("POST", pattern, handler); }
+    function put(pattern: String, handler: (Request) -> Response) { me.add("PUT", pattern, handler); }
+    function patch(pattern: String, handler: (Request) -> Response) { me.add("PATCH", pattern, handler); }
+    function delete_route(pattern: String, handler: (Request) -> Response) { me.add("DELETE", pattern, handler); }
+    function options(pattern: String, handler: (Request) -> Response) { me.add("OPTIONS", pattern, handler); }
+
+    function group(prefix: String) -> RouteGroup {
+        return RouteGroup(me.router, me.prefix + prefix, me.middlewares);
+    }
+};

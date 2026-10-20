@@ -1,9 +1,6 @@
-# tombstone/router.clsx - Router con parámetros de ruta (`/users/{id}`).
-#
-# Matching por método + segmentos, params posicionales y 404/405.
-# Las constraints (`where`), opcionales (`{id?}`) y named routes quedan para
-# la siguiente fase de routing.
+# tombstone/router.clsx - Router con parámetros de ruta y middleware por ruta.
 from "httpd" import Request, Response;
+from "./middleware" import Middleware;
 
 export class RouteMatch {
     public var matched: bool;
@@ -19,17 +16,16 @@ export class Route {
     public var http_method: String;
     public var pattern: String;
     public var handler: (Request) -> Response;
+    public var middlewares: Middleware[];
 
     function main(http_method: String, pattern: String, handler: (Request) -> Response) {
         me.http_method = http_method;
         me.pattern = pattern;
         me.handler = handler;
+        me.middlewares = [];
     }
 }
 
-# Compara patrón y path segmento a segmento. `{x}` captura en params.
-# Nota: el parámetro no se llama `path` porque ese identificador se parsea como
-# namespace del módulo interno homónimo (bug del lenguaje; ver README).
 export function route_matches(pattern: String, route_path: String) -> RouteMatch {
     var params: Record<String, String> = {};
     var pp = pattern.split("/");
@@ -60,6 +56,15 @@ export class Router {
         me.routes.push(Route(http_method, pattern, handler));
     }
 
+    function add_with_middleware(
+        http_method: String, pattern: String,
+        handler: (Request) -> Response, middlewares: Middleware[]
+    ) {
+        var r = Route(http_method, pattern, handler);
+        r.middlewares = middlewares;
+        me.routes.push(r);
+    }
+
     function get(pattern: String, handler: (Request) -> Response) { me.add("GET", pattern, handler); }
     function post(pattern: String, handler: (Request) -> Response) { me.add("POST", pattern, handler); }
     function put(pattern: String, handler: (Request) -> Response) { me.add("PUT", pattern, handler); }
@@ -67,7 +72,6 @@ export class Router {
     function delete_route(pattern: String, handler: (Request) -> Response) { me.add("DELETE", pattern, handler); }
     function options(pattern: String, handler: (Request) -> Response) { me.add("OPTIONS", pattern, handler); }
 
-    # 404 si no hay match; 405 si el path existe con otro método.
     function dispatch(req: Request) -> Response {
         var path_exists = false;
         for each r in (me.routes) {
@@ -76,6 +80,10 @@ export class Router {
                 path_exists = true;
                 if (r.http_method == req.http_method) {
                     req.params = m.params;
+                    for each mw in (r.middlewares) {
+                        var mres = mw.run(req);
+                        if (mres.status != 0) { return mres; };
+                    };
                     var h = r.handler;
                     return h(req);
                 };
@@ -87,4 +95,4 @@ export class Router {
         };
         return Response.not_found();
     }
-}
+};

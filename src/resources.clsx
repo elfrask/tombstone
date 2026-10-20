@@ -1,0 +1,13 @@
+# src/resources.clsx - Recursos de salida del demo.
+from "tombstone" import Resource, ModelRow;
+
+export class NoteResource: Resource {
+    function to_record(row: ModelRow) -> Record<String, String> {
+        var r: Record<String, String> = {
+            id: row.get("id"),
+            title: row.get_str("title"),
+            created_at: row.get("created_at")
+        };
+        return r;
+    }
+};

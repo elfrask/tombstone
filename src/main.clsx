@@ -28,6 +28,7 @@ from "tombstone" import parse_cookies, serialize_cookie, system_pid, system_upti
 from "tombstone" import Database, MigrationRunner, serve;
 from "./config" import load_config;
 from "./services" import bootstrap, ApplicationServices;
+from "./resources" import NoteResource;
 from "./controllers" import RegistrationController, NotesController;
 from "./migrations" import CreateInitialSchema;
 from "./views" import Landing, LandingPageProps, Gallery, GalleryPageProps;
@@ -79,6 +80,7 @@ function main(args: String[]) -> int {
     db.connect(config.db_path);
     MigrationRunner(db.orm).add(CreateInitialSchema()).run();
     var services: ApplicationServices = bootstrap(db, config);
+    var note_resource = NoteResource();
     var app = App();
     app.cors(CorsOptions());
     app.use("logging", (req: Request) -> Response {
@@ -131,27 +133,27 @@ function main(args: String[]) -> int {
 
     # Model sobre SQLite en memoria.
     app.get("/api/notes", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).index();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).index();
     });
 
     app.post("/api/notes", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).store();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).store();
     });
 
     app.get("/api/notes/trashed", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).trashed();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).trashed();
     });
 
     app.delete_route("/api/notes/{id}", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).destroy();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).destroy();
     });
 
     app.post("/api/notes/{id}/restore", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).restore();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).restore();
     });
 
     app.get("/api/notes/{id}", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note).show();
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).show();
     });
 
     app.get("/cookies", (req: Request) -> Response {

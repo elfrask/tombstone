@@ -6,6 +6,7 @@ from "httpd" import Request, Response;
 import "httpd" as httpd;
 
 from "./router" import Router;
+from "./group" import RouteGroup;
 from "./middleware" import Middleware;
 from "./static" import StaticHandler;
 from "./cors" import CorsOptions, cors_apply;
@@ -62,6 +63,10 @@ export class App {
     function use(mw_name: String, fn: (Request) -> Response) -> App {
         me.middlewares.push(Middleware(mw_name, fn));
         return me;
+    }
+
+    function group(prefix: String) -> RouteGroup {
+        return RouteGroup(me.router, prefix, []);
     }
 
     function serve_static(prefix: String, directory: String) -> App {

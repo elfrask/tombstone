@@ -18,6 +18,7 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 |---|---|
 | `app.clsx` | `App`: router + middleware + static + CORS + `serve` |
 | `router.clsx` | `Router`, `Route`, `RouteMatch`, `route_matches` |
+| `group.clsx` | `RouteGroup` (prefijo + middleware por grupo) |
 | `middleware.clsx` | `Middleware` (`status == 0` continúa) |
 | `static.clsx` | `StaticHandler`, `content_type_for` (`fs` del nodo) |
 | `cors.clsx` | `CorsOptions`, `cors_apply`, `cors_preflight` |
@@ -36,6 +37,7 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 | `event.clsx` | `Event`, `EventBus`, `Listener` |
 | `log.clsx` | `Logger` (niveles + buffer) |
 | `action.clsx` | `Action`, `Service` (marcadores de capa) |
+| `resource.clsx` | `Resource` (ModelRow -> JSON) |
 | `types/*.clsx` | interfaces de props CMX (una por etiqueta HTML + UI) |
 | `mod.clsx` | barrel público (motor + tipos) |
 

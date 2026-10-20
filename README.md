@@ -57,6 +57,8 @@ tombstone/
 │   │   ├── event.clsx       # EventBus + Event/Listener
 │   │   ├── log.clsx         # Logger
 │   │   └── action.clsx      # Action/Service
+│   │   ├── group.clsx        # RouteGroup (prefijo + middleware)
+│   │   ├── resource.clsx     # Resource (presentación JSON)
 │   │   └── types/           # interfaces de props CMX (HTML + UI)
 │   └── tombstone-icons/     # iconos SVG para las vistas
 ├── src/
@@ -68,6 +70,7 @@ tombstone/
 │   ├── repositories.clsx    # NoteRepository
 │   ├── actions.clsx         # Create/Delete/RestoreNoteAction
 │   ├── services.clsx        # ApplicationServices + providers + bootstrap
+│   ├── resources.clsx       # NoteResource
 │   ├── migrations.clsx      # esquema versionado del demo
 │   └── views.clsx           # páginas (Landing, Gallery) con <Componente />
 ├── public/                  # css / js / favicon servidos por /public
@@ -389,6 +392,7 @@ var many = UserFactory(users).create_many(3, {});
 El demo separa controller, DTO, Action y Repository:
 
 - `ApplicationServices` (`src/services.clsx`) es el contenedor tipado:
+│   ├── resources.clsx       # NoteResource
   `config`, `db`, `events`, `logger`, `notes`, `create_note`, `delete_note`,
   `restore_note`.
 - `ServiceProvider` expone `register(services)`/`boot(services)`; `bootstrap`
@@ -408,6 +412,8 @@ El demo separa controller, DTO, Action y Repository:
   `cors`, `handle(raw)`, `dispatch(Request)`, `serve(host, port)`.
 - `Router`: `add`, verbos, `dispatch(Request)`; `{param}` + 404/405.
 - `Middleware`: `(Request) -> Response`; `status == 0` continúa.
+- `RouteGroup`: prefijo, verbos y middleware por ruta/grupo.
+- `Resource`: transforma `ModelRow` a `Record<String,String>`/colección.
 - `Request`: `http_method`, `path`, `query`, `query_param`, `headers`,
   `header`, `body`, `params`, `param`, `form`, `files`, `input`, `all`,
   `validate`, `validate_schema`, `file`, `has_file`.
