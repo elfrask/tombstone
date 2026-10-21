@@ -1,0 +1,80 @@
+# src/console.clsx - Consola de la aplicacion Tombstone.
+#
+#   tombstone migrate
+#   tombstone migrate:rollback
+#   tombstone migrate:status
+#   tombstone db:seed
+#
+# `tombstone` es un launcher shell global (~/.cls/bin) que ejecuta:
+#   clx run <project>/src/console.clsx -- <comando>
+import "sqlite" as sqlite;
+from "tombstone" import Database, MigrationRunner;
+from "./config" import load_config;
+from "./migrations" import CreateInitialSchema, CreateSessions, AddUserRole;
+from "./services" import bootstrap, ApplicationServices;
+from "./seeders" import UserSeeder, NoteSeeder;
+
+function usage() {
+    print("Uso: tombstone <comando>");
+    print("  migrate");
+    print("  migrate:rollback");
+    print("  migrate:status");
+    print("  db:seed");
+};
+
+function runner_for(db: Database) -> MigrationRunner {
+    return MigrationRunner(db.orm)
+        .add(CreateInitialSchema())
+        .add(CreateSessions())
+        .add(AddUserRole());
+};
+
+function connect() -> Database {
+    var config = load_config();
+    var db = Database(sqlite::SqliteDriver());
+    db.connect(config.db_path);
+    return db;
+};
+
+function seed(db: Database) -> int {
+    var config = load_config();
+    var services: ApplicationServices = bootstrap(db, config);
+    var seeders: Seeder[] = [];
+    seeders.push(UserSeeder(services.users));
+    seeders.push(NoteSeeder(services.notes, services.users));
+    var n = 0;
+    for each s in (seeders) { n = n + s.run(db); };
+    print("seeded:" + n.toString() + " db=" + config.db_path);
+    return 0;
+};
+
+function main(args: String[]) -> int {
+    if (args.length == 0) { usage(); return 1; };
+    var cmd = args[0];
+    var db = connect();
+    var runner = runner_for(db);
+
+    if (cmd == "migrate") {
+        var n = runner.run();
+        print("migrated:" + n.toString() + " db=" + load_config().db_path);
+        return 0;
+    };
+    if (cmd == "migrate:rollback") {
+        var n = runner.rollback();
+        print("rolled_back:" + n.toString());
+        return 0;
+    };
+    if (cmd == "migrate:status") {
+        var st = runner.status();
+        if (st.length == 0) { print("no migrations"); }
+        for each s in (st) { print(s); };
+        return 0;
+    };
+    if (cmd == "db:seed") {
+        runner.run();
+        return seed(db);
+    };
+    print("Comando desconocido: " + cmd);
+    usage();
+    return 1;
+};

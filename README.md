@@ -183,12 +183,29 @@ policies) y **70 checks de integración PASS** (landing, UI kit, API,
 auth/sesión, CSRF, rate limit, Model SQLite + soft delete/restore, cookies,
 CORS, static, 404/405).
 
-## Seeds
+## Consola y seeds
+
+Instalá el launcher global una vez:
 
 ```powershell
-scripts\db-seed.cmd
-# o: clx run cls-repositories\tombstone\src\seed.clsx
+powershell -File cls-repositories\tombstone\scripts\install-global.ps1
 ```
+
+```bash
+bash cls-repositories/tombstone/scripts/install-global.sh
+```
+
+Agregá `~/.cls/bin` al `PATH`. Desde la raíz de una app Tombstone:
+
+```powershell
+tombstone migrate
+tombstone migrate:rollback
+tombstone migrate:status
+tombstone db:seed
+```
+
+El launcher usa `CLX` (ruta/binario de `clx`) y `TOMBSTONE_CONSOLE`
+(por defecto `src/console.clsx`).
 
 Los seeders son idempotentes; con `TOMBSTONE_DB=archivo.db` persisten entre
 ejecuciones. `src/seeders.clsx` crea el usuario admin y una nota de bienvenida
@@ -490,7 +507,7 @@ El demo separa controller, DTO, Action y Repository:
 - `Migration`/`MigrationRunner`: migraciones versionadas (`run`, `rollback`,
   `reset`, `status`).
 - `Factory`: `make`, `create`, `create_many`.
-- `Seeder`: base idempotente; demo en `src/seeders.clsx` y `scripts/db-seed.*`.
+- `Seeder`: base idempotente; demo en `src/seeders.clsx`; comando `tombstone db:seed`.
 - `TestClient`/`TestResponse`: requests in-process, cookie jar y asserts.
 - `Cache`/`FileCache`: TTL en memoria/archivo; `get/put/has/forget/flush`.
 - `Response`: `text`, `html`, `json_raw`, `json_response`, `redirect`,
