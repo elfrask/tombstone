@@ -204,5 +204,8 @@ Requiere el repo CLS en `pathModules` (ver README del proyecto) para resolver
   módulo; no son comandos de `clx`.
 - `setup.clsx` registra el paquete al instalar `clx install` (una vez por
   versión) y se apoya en `CLS_MODULE_DIR` / `CLS_GLOBAL_BIN`.
+- `console.clsx` expone `create app` y los `make:*`; `generator.clsx` contiene
+  las plantillas.
+- `tombstone.sh` es un alias POSIX del launcher sin extensión.
 - `clx start` añade al `PATH` los `bin/` de los módulos resueltos
   (`modules/*/bin`, `pathModules`, `~/.cls/modules`, `~/.cls/bin`).

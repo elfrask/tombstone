@@ -9,6 +9,7 @@
 #   clx run <project>/src/console.clsx -- <comando>
 import "sqlite" as sqlite;
 from "tombstone" import Database, MigrationRunner;
+from "tombstone" import make_controller, make_model, make_migration, make_factory, make_action, make_resource;
 from "./config" import load_config;
 from "./migrations" import CreateInitialSchema, CreateSessions, AddUserRole;
 from "./services" import bootstrap, ApplicationServices;
@@ -20,6 +21,12 @@ function usage() {
     print("  migrate:rollback");
     print("  migrate:status");
     print("  db:seed");
+    print("  make:controller <Nombre>");
+    print("  make:model <Nombre>");
+    print("  make:migration <nombre>");
+    print("  make:factory <Nombre>");
+    print("  make:action <Nombre>");
+    print("  make:resource <Nombre>");
 };
 
 function runner_for(db: Database) -> MigrationRunner {
@@ -48,9 +55,30 @@ function seed(db: Database) -> int {
     return 0;
 };
 
+function make_command(cmd: String, args: String[]) -> int {
+    if (args.length < 2) {
+        print("Falta el nombre: " + cmd + " <Nombre>");
+        return 1;
+    };
+    var name = args[1];
+    var force = false;
+    for each a in (args) {
+        if (a == "--force" || a == "-f") { force = true; };
+    };
+    if (cmd == "make:controller") { return make_controller(name, force); };
+    if (cmd == "make:model") { return make_model(name, force); };
+    if (cmd == "make:migration") { return make_migration(name, force); };
+    if (cmd == "make:factory") { return make_factory(name, force); };
+    if (cmd == "make:action") { return make_action(name, force); };
+    if (cmd == "make:resource") { return make_resource(name, force); };
+    print("Comando desconocido: " + cmd);
+    return 1;
+};
+
 function main(args: String[]) -> int {
     if (args.length == 0) { usage(); return 1; };
     var cmd = args[0];
+    if (cmd.startsWith("make:")) { return make_command(cmd, args); };
     var db = connect();
     var runner = runner_for(db);
 

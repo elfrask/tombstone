@@ -179,7 +179,7 @@ Cobertura actual: **13 tests unitarios PASS** (request/response/router/app,
 template, view, types, validation/form/multipart, cookies/CORS/JSON/static,
 status, TestClient y Cache), **75 checks DB PASS** (Model CRUD + migraciones,
 relaciones, eventos, timestamps, soft deletes, factories, sessions/CSRF y
-policies) y **70 checks de integración PASS** (landing, UI kit, API,
+policies) y **71 checks de integración PASS** (landing, UI kit, API,
 auth/sesión, CSRF, rate limit, Model SQLite + soft delete/restore, cookies,
 CORS, static, 404/405).
 
@@ -202,6 +202,18 @@ tombstone migrate
 tombstone migrate:rollback
 tombstone migrate:status
 tombstone db:seed
+tombstone make:controller Home
+tombstone make:model Note
+tombstone make:migration create_notes
+tombstone make:factory Note
+tombstone make:action CreateNote
+tombstone make:resource Note
+```
+
+En una carpeta vacía:
+
+```powershell
+tombstone create app
 ```
 
 El launcher usa `CLX` (ruta/binario de `clx`) y `TOMBSTONE_CONSOLE`

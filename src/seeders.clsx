@@ -1,7 +1,36 @@
 # src/seeders.clsx - Seeders idempotentes del demo.
-from "tombstone" import Database, ModelRow, Seeder;
+from "tombstone" import Database, Factory, Model, Seeder, hash_password;
 from "./dtos" import NoteInput;
 from "./repositories" import NoteRepository, UserRepository;
+
+
+class UserFactory: Factory {
+    function main(model: Model) { me.model = model; me.sequence = 0; }
+    function make(overrides: Record<String, String>) -> Record<String, String> {
+        var n = me.sequence;
+        me.sequence = me.sequence + 1;
+        var r: Record<String, String> = {
+            name: "Admin " + n.toString(),
+            email: "admin" + n.toString() + "@example.com",
+            password_hash: hash_password("secret123")
+        };
+        var keys: String[] = overrides.keys();
+        for each k in (keys) { r[k] = overrides[k]; };
+        return r;
+    }
+};
+
+class NoteFactory: Factory {
+    function main(model: Model) { me.model = model; me.sequence = 0; }
+    function make(overrides: Record<String, String>) -> Record<String, String> {
+        var n = me.sequence;
+        me.sequence = me.sequence + 1;
+        var r: Record<String, String> = {title: "Nota " + n.toString(), user_id: ""};
+        var keys: String[] = overrides.keys();
+        for each k in (keys) { r[k] = overrides[k]; };
+        return r;
+    }
+};
 
 export class UserSeeder: Seeder {
     public var users: UserRepository;
@@ -10,7 +39,7 @@ export class UserSeeder: Seeder {
 
     function run(db: Database) -> int {
         if (me.users.find_by_email("admin@example.com").exists) { return 0; };
-        me.users.create("Admin", "admin@example.com", "secret123");
+        UserFactory(me.users.users).create({email: "admin@example.com"});
         return 1;
     }
 };
@@ -29,7 +58,7 @@ export class NoteSeeder: Seeder {
         var admin = me.users.find_by_email("admin@example.com");
         var owner = "";
         if (admin.exists) { owner = admin.get("id"); };
-        me.notes.create(NoteInput("Nota de bienvenida", owner));
+        NoteFactory(me.notes.notes).create({title: "Nota de bienvenida", user_id: owner});
         return 1;
     }
 };

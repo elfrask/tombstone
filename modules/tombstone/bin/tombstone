@@ -2,6 +2,9 @@
 # tombstone - launcher del modulo (no pertenece a clx).
 set -eu
 MODULE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+if [ -f "$HOME/.cls/bin/.tombstone-home" ]; then
+    MODULE_DIR="$(cat "$HOME/.cls/bin/.tombstone-home")"
+fi
 CLX_BIN="${CLX:-clx}"
 if [ -f "src/console.clsx" ]; then
     CONSOLE="src/console.clsx"

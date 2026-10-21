@@ -1,0 +1,90 @@
+import "fs" as fs;
+from "./generator" import make_controller, make_model, make_migration, make_factory, make_action, make_resource;
+
+function usage() {
+    print("Uso: tombstone <comando>");
+    print("  create app [--force]");
+    print("  make:controller <Nombre>");
+    print("  make:model <Nombre>");
+    print("  make:migration <nombre>");
+    print("  make:factory <Nombre>");
+    print("  make:action <Nombre>");
+    print("  make:resource <Nombre>");
+};
+
+function make_command(cmd: String, args: String[]) -> int {
+    if (args.length < 2) {
+        print("Falta el nombre: " + cmd + " <Nombre>");
+        return 1;
+    };
+    var name = args[1];
+    var force = false;
+    for each a in (args) {
+        if (a == "--force" || a == "-f") { force = true; };
+    };
+    if (cmd == "make:controller") { return make_controller(name, force); };
+    if (cmd == "make:model") { return make_model(name, force); };
+    if (cmd == "make:migration") { return make_migration(name, force); };
+    if (cmd == "make:factory") { return make_factory(name, force); };
+    if (cmd == "make:action") { return make_action(name, force); };
+    if (cmd == "make:resource") { return make_resource(name, force); };
+    print("Comando desconocido: " + cmd);
+    return 1;
+};
+
+function create_app(args: String[]) -> int {
+    var force = false;
+    for each a in (args) {
+        if (a == "--force" || a == "-f") { force = true; };
+    };
+    if (fs.exists("cls.json") && !force) {
+        print("tombstone: ya existe cls.json (usa --force para sobrescribir)");
+        return 1;
+    };
+    fs.mkdir("src");
+    fs.mkdir("public");
+    fs.mkdir("tests/unit");
+    fs.writeFile("cls.json",
+        "{\n" +
+        "  \"name\": \"tombstone-app\",\n" +
+        "  \"version\": \"0.1.0\",\n" +
+        "  \"entry\": \"src/main.clsx\",\n" +
+        "  \"dependencies\": {\"tombstone\": \"^0.2.0\"}\n" +
+        "}\n");
+    fs.writeFile("src/main.clsx",
+        "from \"tombstone\" import App, Request, Response, serve;\n\n" +
+        "function main(args: String[]) -> int {\n" +
+        "    var port = 3000;\n" +
+        "    if (args.length > 0) { port = int(args[0]); };\n" +
+        "    var app = App();\n" +
+        "    app.get(\"/\", (req: Request) -> Response {\n" +
+        "        return Response.text(\"Hello Tombstone\");\n" +
+        "    });\n" +
+        "    return serve(app, port);\n" +
+        "};\n");
+    fs.writeFile("README.md",
+        "# Tombstone app\n\n" +
+        "```bash\n" +
+        "tombstone make:controller Home\n" +
+        "clx run src/main.clsx\n" +
+        "```\n");
+    fs.writeFile(".gitignore", "dist/\nmodules/\n.cls-cache/\n*.db\n");
+    print("created: Tombstone app");
+    return 0;
+};
+
+function main(args: String[]) -> int {
+    if (args.length == 0) { usage(); return 1; };
+    var cmd = args[0];
+    if (cmd == "create") {
+        if (args.length < 2 || args[1] != "app") {
+            print("Uso: tombstone create app [--force]");
+            return 1;
+        };
+        return create_app(args);
+    };
+    if (cmd.startsWith("make:")) { return make_command(cmd, args); };
+    print("Comando desconocido: " + cmd);
+    usage();
+    return 1;
+};

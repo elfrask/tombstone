@@ -1,4 +1,4 @@
-from "tombstone" import Template, render, raw, e, ul_items;
+from "tombstone" import Template, render, raw, e, ul_items, slot;
 import "check" as check;
 
 function main(args: String[]) -> int {
@@ -14,6 +14,10 @@ function main(args: String[]) -> int {
     t.add_script("/public/a.js");
     t.add_meta("color-scheme", "dark");
     t.add_meta_prop("property", "og:title", "Tombstone");
+    t.set_asset_version("v1");
+    t.section("sidebar", "hola");
+    t.push("scripts", "a");
+    t.push("scripts", "b");
 
     var page = (
         <main>
@@ -35,11 +39,17 @@ function main(args: String[]) -> int {
     check::assertTrue("tpl.body_class", html.contains("<body class=\"landing\">"));
     check::assertTrue("tpl.escape", html.contains("<h1>T &amp; &lt;x&gt;</h1>"));
     check::assertTrue("tpl.raw", html.contains("<b>ok</b>"));
+    check::assertEqStr("tpl.section", t.yield_section("sidebar"), "hola");
+    check::assertEqStr("tpl.stack", t.stack("scripts"), "ab");
+    check::assertEqStr("tpl.asset", t.asset("/public/a.css"), "/public/a.css?v=v1");
 
     check::assertEqStr("e.all", e("&<>\"'"), "&amp;&lt;&gt;&quot;&#39;");
 
     var list = (<ul>{ul_items(["<x>", "y"])}</ul>);
     check::assertEqStr("ul_items", render(list), "<ul><li>&lt;x&gt;</li><li>y</li></ul>");
+
+    var child = (<div slot="head">hola</div>);
+    check::assertEqStr("slot.named", render(slot("head", [child])), "<div slot=\"head\">hola</div>");
 
     if (check::fails() > 0) {
         return 1;

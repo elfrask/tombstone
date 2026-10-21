@@ -1,0 +1,204 @@
+import "fs" as fs;
+
+function is_upper(c: Char) -> bool {
+    var n = ord(c);
+    return n >= 65 && n <= 90;
+}
+
+function lower_char(c: Char) -> Char {
+    var n = ord(c);
+    if (n >= 65 && n <= 90) { return char(n + 32); };
+    return c;
+}
+
+function upper_char(c: Char) -> Char {
+    var n = ord(c);
+    if (n >= 97 && n <= 122) { return char(n - 32); };
+    return c;
+}
+
+function pascal(name: String) -> String {
+    var out = "";
+    var next_upper = true;
+    for each c in (name.toChar()) {
+        var n = ord(c);
+        if (n == 95 || n == 45 || n == 32 || n == 47) {
+            next_upper = true;
+            continue;
+        };
+        if (next_upper) {
+            out = out + upper_char(c).toString();
+            next_upper = false;
+        } else {
+            out = out + lower_char(c).toString();
+        };
+    };
+    if (out.length == 0) { return "Item"; };
+    return out;
+}
+
+function snake(name: String) -> String {
+    var out = "";
+    for each c in (name.toChar()) {
+        var n = ord(c);
+        if (is_upper(c)) {
+            if (out.length > 0) { out = out + "_"; };
+            out = out + lower_char(c).toString();
+        } else {
+            if (n == 45 || n == 32 || n == 47) {
+                if (out.length > 0) { out = out + "_"; };
+            } else {
+                out = out + c.toString();
+            };
+        };
+    };
+    return out;
+}
+
+function drop_last(s: String) -> String {
+    var out = "";
+    for each c and i in (s.toChar()) {
+        if (i < s.length - 1) { out = out + c.toString(); };
+    };
+    return out;
+}
+
+function plural(s: String) -> String {
+    if (s.endsWith("s")) { return s; };
+    if (s.endsWith("y") && s.length > 1) { return drop_last(s) + "ies"; };
+    return s + "s";
+}
+
+function controller_class(name: String) -> String {
+    var c = pascal(name);
+    if (c.endsWith("Controller")) { return c; };
+    return c + "Controller";
+}
+
+function action_class(name: String) -> String {
+    var c = pascal(name);
+    if (c.endsWith("Action")) { return c; };
+    return c + "Action";
+}
+
+function output(path: String, body: String, force: bool) -> int {
+    if (fs.exists(path) && !force) {
+        print("skip: " + path);
+        return 0;
+    };
+    fs.writeFile(path, body);
+    print("created: " + path);
+    return 1;
+}
+
+export function make_controller(name: String, force: bool) -> int {
+    var cls = controller_class(name);
+    fs.mkdir("src/controllers");
+    var body =
+        "from \"tombstone\" import Controller, Request, Response;\n\n" +
+        "export class " + cls + ": Controller {\n" +
+        "    function index() -> Response {\n" +
+        "        return Response.text(\"" + cls + "\");\n" +
+        "    }\n" +
+        "};\n";
+    return output("src/controllers/" + cls + ".clsx", body, force);
+}
+
+export function make_model(name: String, force: bool) -> int {
+    var cls = pascal(name);
+    var table = snake(plural(name));
+    fs.mkdir("src/models");
+    var body =
+        "import \"orm\" as orm;\n" +
+        "from \"tombstone\" import Model;\n\n" +
+        "export class " + cls + ": Model {\n" +
+        "    public var orm: orm::Orm;\n" +
+        "    public var table: String;\n" +
+        "    public var primary_key: String;\n" +
+        "    public var data: Record<String, String>;\n" +
+        "    public var exists: bool;\n" +
+        "    public var has_timestamps: bool;\n" +
+        "    public var uses_soft_deletes: bool;\n" +
+        "    function main(o: orm::Orm) {\n" +
+        "        me.orm = o;\n" +
+        "        me.table = \"" + table + "\";\n" +
+        "        me.primary_key = \"id\";\n" +
+        "        me.data = {};\n" +
+        "        me.exists = false;\n" +
+        "        me.has_timestamps = true;\n" +
+        "        me.uses_soft_deletes = false;\n" +
+        "    }\n" +
+        "};\n";
+    return output("src/models/" + cls + ".clsx", body, force);
+}
+
+export function make_migration(name: String, force: bool) -> int {
+    var cls = pascal(name);
+    var stamp = now().toString();
+    var migration_name = stamp + "_" + snake(name);
+    var table = snake(plural(name));
+    fs.mkdir("src/migrations");
+    var body =
+        "from \"tombstone\" import DbSchema, Migration;\n\n" +
+        "export class " + cls + ": Migration {\n" +
+        "    public var migration_name: String;\n" +
+        "    function main() { me.migration_name = \"" + migration_name + "\"; }\n\n" +
+        "    function up(schema: DbSchema) -> int {\n" +
+        "        var t = schema.blueprint(\"" + table + "\");\n" +
+        "        t.id();\n" +
+        "        t.string(\"name\");\n" +
+        "        t.timestamps();\n" +
+        "        return schema.create(t);\n" +
+        "    }\n\n" +
+        "    function down(schema: DbSchema) -> int { return schema.drop(\"" + table + "\"); }\n" +
+        "};\n";
+    return output("src/migrations/" + migration_name + ".clsx", body, force);
+}
+
+export function make_factory(name: String, force: bool) -> int {
+    var cls = pascal(name) + "Factory";
+    fs.mkdir("src/factories");
+    var body =
+        "from \"tombstone\" import Factory, Model;\n\n" +
+        "export class " + cls + ": Factory {\n" +
+        "    public var model: Model;\n" +
+        "    public var sequence: int;\n" +
+        "    function main(model: Model) {\n" +
+        "        me.model = model;\n" +
+        "        me.sequence = 0;\n" +
+        "    }\n\n" +
+        "    function make(overrides: Record<String, String>) -> Record<String, String> {\n" +
+        "        var r: Record<String, String> = {name: \"" + pascal(name) + " \" + me.sequence.toString()};\n" +
+        "        me.sequence = me.sequence + 1;\n" +
+        "        var keys: String[] = overrides.keys();\n" +
+        "        for each k in (keys) { r[k] = overrides[k]; };\n" +
+        "        return r;\n" +
+        "    }\n" +
+        "};\n";
+    return output("src/factories/" + cls + ".clsx", body, force);
+}
+
+export function make_action(name: String, force: bool) -> int {
+    var cls = action_class(name);
+    fs.mkdir("src/actions");
+    var body =
+        "from \"tombstone\" import Action;\n\n" +
+        "export class " + cls + ": Action {\n" +
+        "    function name() -> String { return \"" + snake(name) + "\"; }\n" +
+        "    function handle(input: String) -> String { return input; }\n" +
+        "};\n";
+    return output("src/actions/" + cls + ".clsx", body, force);
+}
+
+export function make_resource(name: String, force: bool) -> int {
+    var cls = pascal(name) + "Resource";
+    fs.mkdir("src/resources");
+    var body =
+        "from \"tombstone\" import ModelRow, Resource;\n\n" +
+        "export class " + cls + ": Resource {\n" +
+        "    function to_record(row: ModelRow) -> Record<String, String> {\n" +
+        "        return row.to_record();\n" +
+        "    }\n" +
+        "};\n";
+    return output("src/resources/" + cls + ".clsx", body, force);
+}

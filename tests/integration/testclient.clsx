@@ -1,0 +1,17 @@
+from "tombstone" import App, Request, Response, TestClient;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+    var app = App();
+    app.get("/health", (req: Request) -> Response {
+        return Response.json_response("{\"ok\":true}");
+    });
+    app.post("/echo", (req: Request) -> Response {
+        return Response.json_response("{\"body\":\"" + req.body + "\"}");
+    });
+    var client = TestClient(app);
+    client.get("/health").assert_status(200).assert_json("ok", "true");
+    client.post("/echo", "hola").assert_status(200).assert_json("body", "hola");
+    return check::fails();
+};

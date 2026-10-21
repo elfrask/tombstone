@@ -23,6 +23,7 @@ from "./pagination" import PaginatedResource;
 from "./testing" import TestClient, TestResponse;
 from "./seeder" import Seeder;
 from "./cache" import Cache, CacheEntry, FileCache;
+from "./generator" import make_controller, make_model, make_migration, make_factory, make_action, make_resource;
 
 from "./status" import HttpStatus;
 from "./router" import Router, Route, RouteMatch, route_matches;
@@ -36,7 +37,7 @@ from "./cookies" import CookieOptions, parse_cookies, serialize_cookie;
 from "./json" import json_encode, json_decode, json_parse_safe, json_body;
 from "./json" import json_response, json_response_raw, json_string_array;
 from "./lib" import system_pid, system_uptime_ms, system_env;
-from "./view" import raw, e, render, renderChildren, attrs, isVoid, renderEach, layout, ul_items;
+from "./view" import raw, e, render, renderChildren, slot, attrs, isVoid, renderEach, layout, ul_items;
 from "./template" import MetaTag, Template, render_html;
 from "./types/global" import *;
 from "./types/document" import *;
@@ -71,6 +72,7 @@ export { PaginatedResource };
 export { TestClient, TestResponse };
 export { Seeder };
 export { Cache, CacheEntry, FileCache };
+export { make_controller, make_model, make_migration, make_factory, make_action, make_resource };
 export { HttpStatus };
 export { Router, Route, RouteMatch, route_matches };
 export { ControllerRoute };
@@ -83,7 +85,7 @@ export { CookieOptions, parse_cookies, serialize_cookie };
 export { json_encode, json_decode, json_parse_safe, json_body };
 export { json_response, json_response_raw, json_string_array };
 export { system_pid, system_uptime_ms, system_env };
-export { raw, e, render, renderChildren, attrs, isVoid, renderEach, layout, ul_items };
+export { raw, e, render, renderChildren, slot, attrs, isVoid, renderEach, layout, ul_items };
 export { MetaTag, Template, render_html };
 
 # Tipos de props CMX (una interface por etiqueta HTML + UI).

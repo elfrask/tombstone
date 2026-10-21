@@ -23,6 +23,7 @@ function main(args: String[]) -> int {
     var unix = copy_text(mod_dir + "/bin/tombstone", bin_dir + "/tombstone");
     var sh = copy_text(mod_dir + "/bin/tombstone.sh", bin_dir + "/tombstone.sh");
     var win = copy_text(mod_dir + "/bin/tombstone.cmd", bin_dir + "/tombstone.cmd");
+    fs.writeFile(bin_dir + "/.tombstone-home", mod_dir + "\n");
     fs.writeFile(bin_dir + "/.tombstone.json",
         "{\"module\":\"" + mod_dir + "\",\"version\":\"" + system_env("CLS_MODULE_VERSION") + "\"}\n");
     print("setup: tombstone registrado en " + bin_dir + " (" + str(unix) + "/" + str(sh) + "/" + str(win) + ")");

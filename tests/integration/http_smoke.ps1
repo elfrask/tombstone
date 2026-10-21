@@ -12,6 +12,7 @@ $repo = (Resolve-Path (Join-Path $here "..\..\..\..")).Path
 $tombstone = (Resolve-Path (Join-Path $here "..\..")).Path
 $clx = Join-Path $repo "target\debug\clx.exe"
 $entry = Join-Path $tombstone "src\main.clsx"
+$testclient = Join-Path $tombstone "tests\integration\testclient.clsx"
 
 if (-not (Test-Path $clx)) {
     Write-Host "ERROR: falta $clx (compila con: cargo build --bin clx)"
@@ -72,6 +73,12 @@ function CurlJson($path, $json) {
 }
 
 try {
+    Push-Location $tombstone
+    & $clx run $testclient | Out-Host
+    $tcExit = $LASTEXITCODE
+    Pop-Location
+    Check "TestClient in-process" ($tcExit -eq 0) "exit $tcExit"
+
     $proc = Start-Process -FilePath $clx `
         -ArgumentList @("run", $entry, "--", "$port") `
         -WorkingDirectory $repo -NoNewWindow -PassThru `

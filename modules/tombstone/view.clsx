@@ -115,6 +115,19 @@ export function renderChildren(children: Cmx[]) -> String {
     return out;
 }
 
+
+# Slot nombrado: children marcados con `slot="name"`.
+export function slot(name: String, children: Cmx[]) -> Cmx {
+    var html = "";
+    for each ch in (children) {
+        if (ch.kind != 0) { continue; };
+        if (!ch.props.has("slot")) { continue; };
+        if (str(ch.props["slot"]) != name) { continue; };
+        html = html + render(ch);
+    };
+    return raw(html);
+}
+
 # --- helpers de composición (bucles y layouts) ----------------------------
 export function renderEach(items: String[], fn: (String) -> Cmx) -> String {
     var out = "";

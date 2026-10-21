@@ -2,8 +2,34 @@
 from "./model" import ModelRow;
 
 export class Resource {
+    public var only_fields: String[];
+    public var except_fields: String[];
+
+    function main() {
+        me.only_fields = [];
+        me.except_fields = [];
+    }
+
+    function only(fields: String[]) -> Resource {
+        me.only_fields = fields;
+        return me;
+    }
+
+    function except(fields: String[]) -> Resource {
+        me.except_fields = fields;
+        return me;
+    }
+
     function to_record(row: ModelRow) -> Record<String, String> {
-        return row.to_record();
+        var all = row.to_record();
+        var out: Record<String, String> = {};
+        var keys: String[] = all.keys();
+        for each k in (keys) {
+            if (me.only_fields.length > 0 && !me.only_fields.includes(k)) { continue; };
+            if (me.except_fields.includes(k)) { continue; };
+            out[k] = all[k];
+        };
+        return out;
     }
 
     function collection(rows: ModelRow[]) -> Record<String, String>[] {

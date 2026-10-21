@@ -43,6 +43,9 @@ export class Template {
     public var inline_script: String;
     public var metas: MetaTag[];
     public var head_html: String;
+    public var sections: Record<String, String>;
+    public var stacks: Record<String, String>;
+    public var asset_version: String;
 
     function main() {
         me.lang = "es";
@@ -60,6 +63,9 @@ export class Template {
         me.inline_script = "";
         me.metas = [];
         me.head_html = "";
+        me.sections = {};
+        me.stacks = {};
+        me.asset_version = "";
     }
 
     static function derive(parent: Template) -> Template {
@@ -76,6 +82,11 @@ export class Template {
         t.inline_style = parent.inline_style;
         t.inline_script = parent.inline_script;
         t.head_html = parent.head_html;
+        t.asset_version = parent.asset_version;
+        var section_keys: String[] = parent.sections.keys();
+        for each k in (section_keys) { t.sections[k] = parent.sections[k]; };
+        var stack_keys: String[] = parent.stacks.keys();
+        for each k in (stack_keys) { t.stacks[k] = parent.stacks[k]; };
 
         for each s in (parent.styles) {
             t.styles.push(s);
@@ -102,6 +113,36 @@ export class Template {
     function set_inline_style(css: String) -> Template { me.inline_style = css; return me; }
     function set_inline_script(js: String) -> Template { me.inline_script = js; return me; }
     function set_head(html: String) -> Template { me.head_html = html; return me; }
+    function set_asset_version(v: String) -> Template { me.asset_version = v; return me; }
+
+    function section(name: String, content: String) -> Template {
+        me.sections[name] = content;
+        return me;
+    }
+
+    function yield_section(name: String) -> String {
+        if (me.sections.has(name)) { return me.sections[name]; };
+        return "";
+    }
+
+    function push(name: String, content: String) -> Template {
+        if (me.stacks.has(name)) {
+            me.stacks[name] = me.stacks[name] + content;
+        } else {
+            me.stacks[name] = content;
+        };
+        return me;
+    }
+
+    function stack(name: String) -> String {
+        if (me.stacks.has(name)) { return me.stacks[name]; };
+        return "";
+    }
+
+    function asset(path: String) -> String {
+        if (me.asset_version.length == 0) { return path; };
+        return path + "?v=" + me.asset_version;
+    }
 
     function add_style(href: String) -> Template {
         me.styles.push(href);
