@@ -41,17 +41,21 @@ function create_app(args: String[]) -> int {
         print("tombstone: ya existe cls.json (usa --force para sobrescribir)");
         return 1;
     };
-    fs.mkdir("src");
-    fs.mkdir("public");
-    fs.mkdir("tests/unit");
+    var dirs: String[] = [
+        "app/routes", "app/resources", "app/components", "app/views",
+        "app/controllers", "app/requests", "app/core", "app/services", "app/models",
+        "database/migrations", "database/database", "database/seeds",
+        "config", "public", "tests/unit"
+    ];
+    for each d in (dirs) { fs.mkdir(d); };
     fs.writeFile("cls.json",
         "{\n" +
         "  \"name\": \"tombstone-app\",\n" +
         "  \"version\": \"0.1.0\",\n" +
-        "  \"entry\": \"src/main.clsx\",\n" +
+        "  \"entry\": \"app/main.clsx\",\n" +
         "  \"dependencies\": {\"tombstone\": \"^0.2.0\"}\n" +
         "}\n");
-    fs.writeFile("src/main.clsx",
+    fs.writeFile("app/main.clsx",
         "from \"tombstone\" import App, Request, Response, serve;\n\n" +
         "function main(args: String[]) -> int {\n" +
         "    var port = 3000;\n" +
@@ -62,13 +66,36 @@ function create_app(args: String[]) -> int {
         "    });\n" +
         "    return serve(app, port);\n" +
         "};\n");
+    fs.writeFile("app/routes/index.clsx",
+        "from \"tombstone\" import App, Request, Response;\n" +
+        "export function register_routes(app: App) -> App {\n" +
+        "    app.get(\"/health\", (req: Request) -> Response {\n" +
+        "        return Response.json_response(\"{\\\"ok\\\":true}\");\n" +
+        "    });\n" +
+        "    return app;\n" +
+        "};\n");
+    fs.writeFile("config/environment.clsx",
+        "import \"env\" as env;\n" +
+        "export function load_env() -> env::Env { return env::load(\".env\"); };\n");
+    fs.writeFile("config/app.clsx",
+        "from \"./environment\" import load_env;\n" +
+        "export class AppConfig { public var name: String; public var environment: String; };\n" +
+        "export function load_config() -> AppConfig {\n" +
+        "    var e = load_env(); var c = AppConfig();\n" +
+        "    c.name = \"Tombstone App\"; c.environment = \"development\";\n" +
+        "    if (e.get(\"APP_NAME\") != \"\") { c.name = e.get(\"APP_NAME\"); };\n" +
+        "    if (e.get(\"APP_ENV\") != \"\") { c.environment = e.get(\"APP_ENV\"); };\n" +
+        "    return c;\n" +
+        "};\n");
+    fs.writeFile(".env.example", "APP_NAME=Tombstone App\nAPP_ENV=development\nDB_PATH=:memory:\n");
+    fs.writeFile(".gitignore", "dist/\nmodules/\n.cls-cache/\n.env\n*.db\n");
     fs.writeFile("README.md",
         "# Tombstone app\n\n" +
         "```bash\n" +
+        "cp .env.example .env\n" +
         "tombstone make:controller Home\n" +
-        "clx run src/main.clsx\n" +
+        "clx run app/main.clsx -- 3000\n" +
         "```\n");
-    fs.writeFile(".gitignore", "dist/\nmodules/\n.cls-cache/\n*.db\n");
     print("created: Tombstone app");
     return 0;
 };
