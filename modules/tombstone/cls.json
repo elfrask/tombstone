@@ -5,6 +5,7 @@
   "export": {
     "entry": "mod.clsx"
   },
+  "setup": "setup.clsx",
   "dependencies": {
     "argon2": "^1.0.0",
     "csprng": "^0.1.0"

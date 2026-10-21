@@ -197,3 +197,12 @@ function main(args: String[]) -> int {
 
 Requiere el repo CLS en `pathModules` (ver README del proyecto) para resolver
 `httpd`/`socket`/`orm`/`sqlite`; `static` usa `fs` del nodo.
+
+## CLI y setup
+
+- `bin/tombstone` (POSIX) y `bin/tombstone.cmd` (Windows) son el launcher del
+  módulo; no son comandos de `clx`.
+- `setup.clsx` registra el paquete al instalar `clx install` (una vez por
+  versión) y se apoya en `CLS_MODULE_DIR` / `CLS_GLOBAL_BIN`.
+- `clx start` añade al `PATH` los `bin/` de los módulos resueltos
+  (`modules/*/bin`, `pathModules`, `~/.cls/modules`, `~/.cls/bin`).

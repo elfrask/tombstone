@@ -188,11 +188,11 @@ CORS, static, 404/405).
 Instalá el launcher global una vez:
 
 ```powershell
-powershell -File cls-repositories\tombstone\scripts\install-global.ps1
+powershell -File cls-repositories\tombstone\modules\tombstone\scripts\install-global.ps1
 ```
 
 ```bash
-bash cls-repositories/tombstone/scripts/install-global.sh
+bash cls-repositories/tombstone/modules/tombstone/scripts/install-global.sh
 ```
 
 Agregá `~/.cls/bin` al `PATH`. Desde la raíz de una app Tombstone:

@@ -1,0 +1,30 @@
+# setup.clsx - registro global del modulo Tombstone.
+# Lo ejecuta `clx install` una sola vez por version (marcador .cls-setup).
+# Usa herramientas del lenguaje (fs + lib) y variables de entorno del gestor.
+
+import "fs" as fs;
+from "./lib" import system_env;
+
+function copy_text(src: String, dst: String) -> int {
+    if (!fs.exists(src)) { return 0; };
+    var data = fs.readFile(src);
+    fs.writeFile(dst, data);
+    return 1;
+}
+
+function main(args: String[]) -> int {
+    var mod_dir = system_env("CLS_MODULE_DIR");
+    var bin_dir = system_env("CLS_GLOBAL_BIN");
+    if (mod_dir == "" || bin_dir == "") {
+        print("setup: faltan CLS_MODULE_DIR/CLS_GLOBAL_BIN");
+        return 1;
+    }
+    if (!fs.exists(bin_dir)) { fs.mkdir(bin_dir); };
+    var unix = copy_text(mod_dir + "/bin/tombstone", bin_dir + "/tombstone");
+    var sh = copy_text(mod_dir + "/bin/tombstone.sh", bin_dir + "/tombstone.sh");
+    var win = copy_text(mod_dir + "/bin/tombstone.cmd", bin_dir + "/tombstone.cmd");
+    fs.writeFile(bin_dir + "/.tombstone.json",
+        "{\"module\":\"" + mod_dir + "\",\"version\":\"" + system_env("CLS_MODULE_VERSION") + "\"}\n");
+    print("setup: tombstone registrado en " + bin_dir + " (" + str(unix) + "/" + str(sh) + "/" + str(win) + ")");
+    return 0;
+}
