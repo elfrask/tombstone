@@ -43,6 +43,9 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 | `security.clsx` | `Csrf`, `CsrfMiddleware`, `NotePolicy`, `Gate`, `RateLimiter`, `RateLimitMiddleware` |
 | `resource.clsx` | `Resource` (ModelRow -> JSON) |
 | `pagination.clsx` | `PaginatedResource` (data + meta) |
+| `testing.clsx` | `TestClient`, `TestResponse` (in-process) |
+| `cache.clsx` | `Cache`, `FileCache` con TTL |
+| `seeder.clsx` | `Seeder` base idempotente |
 | `types/*.clsx` | interfaces de props CMX (una por etiqueta HTML + UI) |
 | `mod.clsx` | barrel público (motor + tipos) |
 

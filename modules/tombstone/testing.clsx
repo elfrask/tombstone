@@ -1,0 +1,176 @@
+# tombstone/testing.clsx - Test client HTTP in-process (sin sockets).
+#
+# Reutiliza `App.handle`/`App.dispatch`; mantiene headers y cookie jar entre
+# requests. Pensado para tests CLS rápidos y para reemplazar parte del smoke
+# PowerShell.
+from "httpd" import Request, Response;
+from "./app" import App;
+from "./json" import json_encode, json_parse_safe;
+
+export class TestResponse {
+    public var status: int;
+    public var body: String;
+    public var headers: Record<String, String>;
+    public var cookies: String[];
+
+    function main(res: Response) {
+        me.status = res.status;
+        me.body = res.body;
+        me.headers = res.headers;
+        me.cookies = res.cookies;
+    }
+
+    function header(name: String) -> String {
+        var k = name.lower();
+        if (me.headers.has(k)) { return me.headers[k]; };
+        return "";
+    }
+
+    function json() -> JSON {
+        return json_parse_safe(me.body);
+    }
+
+    function assert_status(code: int) -> TestResponse {
+        if (me.status != code) {
+            throw("TestResponse: status " + me.status.toString() + " != " + code.toString());
+        };
+        return me;
+    }
+
+    function assert_header(name: String, value: String) -> TestResponse {
+        var got = me.header(name);
+        if (got != value) {
+            throw("TestResponse: header " + name + "='" + got + "' != '" + value + "'");
+        };
+        return me;
+    }
+
+    function assert_contains(part: String) -> TestResponse {
+        if (!me.body.contains(part)) {
+            throw("TestResponse: body no contiene '" + part + "'");
+        };
+        return me;
+    }
+
+    function assert_json(key: String, value: String) -> TestResponse {
+        var j = me.json();
+        var got = str(j[key]);
+        if (got != value) {
+            throw("TestResponse: json." + key + "='" + got + "' != '" + value + "'");
+        };
+        return me;
+    }
+
+    function set_cookies(jar: Record<String, String>) -> TestResponse {
+        for each raw in (me.cookies) {
+            var first = raw.split(";")[0];
+            var kv = first.split("=");
+            if (kv.length != 2) { continue; };
+            var name = kv[0].trim();
+            var value = kv[1].trim();
+            var expired = raw.lower().contains("max-age=0");
+            if (value == "" || expired) {
+                if (jar.has(name)) { jar[name] = ""; };
+            } else {
+                jar[name] = value;
+            };
+        };
+        return me;
+    }
+};
+
+export class TestClient {
+    public var app: App;
+    public var headers: Record<String, String>;
+    public var cookies: Record<String, String>;
+
+    function main(app: App) {
+        me.app = app;
+        me.headers = {};
+        me.cookies = {};
+    }
+
+    function with_header(name: String, value: String) -> TestClient {
+        me.headers[name.lower()] = value;
+        return me;
+    }
+
+    function with_cookie(name: String, value: String) -> TestClient {
+        me.cookies[name] = value;
+        return me;
+    }
+
+    function cookie_header() -> String {
+        var out = "";
+        for each name in (me.cookies.keys()) {
+            if (me.cookies[name] == "") { continue; };
+            if (out != "") { out = out + "; "; };
+            out = out + name + "=" + me.cookies[name];
+        };
+        return out;
+    }
+
+    function raw(verb: String, path: String, body: String) -> String {
+        var req = verb + " " + path + " HTTP/1.1\r\nHost: localhost\r\n";
+        for each name in (me.headers.keys()) {
+            req = req + name + ": " + me.headers[name] + "\r\n";
+        };
+        var jar = me.cookie_header();
+        if (jar != "") { req = req + "Cookie: " + jar + "\r\n"; };
+        req = req + "Content-Length: " + body.length.toString() + "\r\n\r\n" + body;
+        return req;
+    }
+
+    function send(verb: String, path: String, body: String) -> TestResponse {
+        var res = me.app.handle(me.raw(verb, path, body));
+        for each raw_cookie in (res.cookies) {
+            var first = raw_cookie.split(";")[0];
+            var kv = first.split("=");
+            if (kv.length != 2) { continue; };
+            var cookie_name = kv[0].trim();
+            var cookie_value = kv[1].trim();
+            var expired = raw_cookie.lower().contains("max-age=0");
+            if (cookie_value == "" || expired) {
+                me.cookies[cookie_name] = "";
+            } else {
+                me.cookies[cookie_name] = cookie_value;
+            };
+        };
+        return TestResponse(res);
+    }
+
+    function get(path: String) -> TestResponse {
+        return me.send("GET", path, "");
+    }
+
+    function post(path: String, body: String) -> TestResponse {
+        me.headers["content-type"] = "application/x-www-form-urlencoded";
+        return me.send("POST", path, body);
+    }
+
+    function put(path: String, body: String) -> TestResponse {
+        me.headers["content-type"] = "application/x-www-form-urlencoded";
+        return me.send("PUT", path, body);
+    }
+
+    function patch(path: String, body: String) -> TestResponse {
+        me.headers["content-type"] = "application/x-www-form-urlencoded";
+        return me.send("PATCH", path, body);
+    }
+
+    function delete(path: String) -> TestResponse {
+        return me.send("DELETE", path, "");
+    }
+
+    function post_json(path: String, value: JSON) -> TestResponse {
+        me.headers["content-type"] = "application/json";
+        return me.send("POST", path, json_encode(value));
+    }
+
+    function assert_cookie(name: String) -> TestClient {
+        if (!me.cookies.has(name) || me.cookies[name] == "") {
+            throw("TestClient: falta cookie '" + name + "'");
+        };
+        return me;
+    }
+};

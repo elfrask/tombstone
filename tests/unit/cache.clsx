@@ -1,0 +1,31 @@
+from "tombstone" import Cache, FileCache;
+import "fs" as fs;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var c = Cache();
+    c.put("a", "1", 60000);
+    check::assertEqStr("cache.get", c.get("a"), "1");
+    check::assertTrue("cache.has", c.has("a"));
+    check::assertEq("cache.count", c.count(), 1);
+    c.put("b", "2", 0);
+    check::assertEqStr("cache.expired", c.get("b"), "");
+    check::assertEq("cache.forget", c.forget("a"), 1);
+    check::assertEq("cache.empty", c.count(), 0);
+
+    var dir = fs.cwd() + "/.cls-cache-test";
+    fs.rm(dir);
+    var fc = FileCache(dir);
+    fc.put("k", "v", 60000);
+    check::assertEqStr("filecache.get", fc.get("k"), "v");
+    fc.put("e", "x", 0);
+    check::assertEqStr("filecache.expired", fc.get("e"), "");
+    check::assertEq("filecache.forget", fc.forget("k"), 1);
+    fc.flush();
+    fs.rm(dir);
+
+    if (check::fails() > 0) { return 1; };
+    return 0;
+};

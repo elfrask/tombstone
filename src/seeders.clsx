@@ -1,0 +1,35 @@
+# src/seeders.clsx - Seeders idempotentes del demo.
+from "tombstone" import Database, ModelRow, Seeder;
+from "./dtos" import NoteInput;
+from "./repositories" import NoteRepository, UserRepository;
+
+export class UserSeeder: Seeder {
+    public var users: UserRepository;
+
+    function main(users: UserRepository) { me.users = users; }
+
+    function run(db: Database) -> int {
+        if (me.users.find_by_email("admin@example.com").exists) { return 0; };
+        me.users.create("Admin", "admin@example.com", "secret123");
+        return 1;
+    }
+};
+
+export class NoteSeeder: Seeder {
+    public var notes: NoteRepository;
+    public var users: UserRepository;
+
+    function main(notes: NoteRepository, users: UserRepository) {
+        me.notes = notes;
+        me.users = users;
+    }
+
+    function run(db: Database) -> int {
+        if (me.notes.count() > 0) { return 0; };
+        var admin = me.users.find_by_email("admin@example.com");
+        var owner = "";
+        if (admin.exists) { owner = admin.get("id"); };
+        me.notes.create(NoteInput("Nota de bienvenida", owner));
+        return 1;
+    }
+};

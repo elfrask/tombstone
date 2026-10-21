@@ -175,12 +175,24 @@ Model/SQLite (desde la raíz; usa `:memory:`):
 powershell -File cls-repositories\tombstone\tests\db\run.ps1
 ```
 
-Cobertura actual: **11 tests unitarios PASS** (request/response/router/app,
+Cobertura actual: **13 tests unitarios PASS** (request/response/router/app,
 template, view, types, validation/form/multipart, cookies/CORS/JSON/static,
-status), **75 checks DB PASS** (Model CRUD + migraciones, relaciones, eventos,
-timestamps, soft deletes, factories, sessions/CSRF y policies) y **70 checks de
-integración PASS** (landing, UI kit, API, auth/sesión, CSRF, rate limit,
-Model SQLite + soft delete/restore, cookies, CORS, static, 404/405).
+status, TestClient y Cache), **75 checks DB PASS** (Model CRUD + migraciones,
+relaciones, eventos, timestamps, soft deletes, factories, sessions/CSRF y
+policies) y **70 checks de integración PASS** (landing, UI kit, API,
+auth/sesión, CSRF, rate limit, Model SQLite + soft delete/restore, cookies,
+CORS, static, 404/405).
+
+## Seeds
+
+```powershell
+scripts\db-seed.cmd
+# o: clx run cls-repositories\tombstone\src\seed.clsx
+```
+
+Los seeders son idempotentes; con `TOMBSTONE_DB=archivo.db` persisten entre
+ejecuciones. `src/seeders.clsx` crea el usuario admin y una nota de bienvenida
+solo si faltan.
 
 ## Configuración de seguridad
 
@@ -478,6 +490,9 @@ El demo separa controller, DTO, Action y Repository:
 - `Migration`/`MigrationRunner`: migraciones versionadas (`run`, `rollback`,
   `reset`, `status`).
 - `Factory`: `make`, `create`, `create_many`.
+- `Seeder`: base idempotente; demo en `src/seeders.clsx` y `scripts/db-seed.*`.
+- `TestClient`/`TestResponse`: requests in-process, cookie jar y asserts.
+- `Cache`/`FileCache`: TTL en memoria/archivo; `get/put/has/forget/flush`.
 - `Response`: `text`, `html`, `json_raw`, `json_response`, `redirect`,
   `status_only`, `not_found`, `header`, `set_cookie`, `serialize`.
 - `Template`: `set_*`, `add_style`, `add_script`, `add_meta`,

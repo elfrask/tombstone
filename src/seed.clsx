@@ -1,0 +1,25 @@
+import "sqlite" as sqlite;
+from "tombstone" import Database, MigrationRunner;
+from "./config" import load_config;
+from "./migrations" import CreateInitialSchema, CreateSessions, AddUserRole;
+from "./services" import bootstrap, ApplicationServices;
+from "./seeders" import UserSeeder, NoteSeeder;
+
+function main(args: String[]) -> int {
+    var config = load_config();
+    var db = Database(sqlite::SqliteDriver());
+    db.connect(config.db_path);
+    MigrationRunner(db.orm)
+        .add(CreateInitialSchema())
+        .add(CreateSessions())
+        .add(AddUserRole())
+        .run();
+    var services: ApplicationServices = bootstrap(db, config);
+    var seeders: Seeder[] = [];
+    seeders.push(UserSeeder(services.users));
+    seeders.push(NoteSeeder(services.notes, services.users));
+    var n = 0;
+    for each s in (seeders) { n = n + s.run(db); };
+    print("seeded:" + n.toString() + " db=" + config.db_path);
+    return 0;
+};

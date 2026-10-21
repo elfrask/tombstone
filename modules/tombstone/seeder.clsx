@@ -1,0 +1,6 @@
+# tombstone/seeder.clsx - Seeders idempotentes sobre la base del proyecto.
+from "./database" import Database;
+
+export class Seeder {
+    function run(db: Database) -> int { return 0; }
+};

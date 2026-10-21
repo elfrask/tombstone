@@ -1,0 +1,120 @@
+# tombstone/cache.clsx - Cache TTL en memoria y archivo.
+#
+# Las claves son explícitas; los valores son String. No hay serialización
+# dinámica insegura: el caller decide qué guarda.
+import "fs" as fs;
+
+export class CacheEntry {
+    public var key: String;
+    public var value: String;
+    public var expires_at: int;
+
+    function main(key: String, value: String, expires_at: int) {
+        me.key = key;
+        me.value = value;
+        me.expires_at = expires_at;
+    }
+};
+
+export class Cache {
+    public var entries: CacheEntry[];
+
+    function main() { me.entries = []; }
+
+    function put(key: String, value: String, ttl_ms: int) -> Cache {
+        var expires = now() + ttl_ms;
+        for each e in (me.entries) {
+            if (e.key == key) {
+                e.value = value;
+                e.expires_at = expires;
+                return me;
+            };
+        };
+        me.entries.push(CacheEntry(key, value, expires));
+        return me;
+    }
+
+    function get(key: String) -> String {
+        for each e in (me.entries) {
+            if (e.key == key) {
+                if (e.expires_at <= now()) {
+                    me.forget(key);
+                    return "";
+                };
+                return e.value;
+            };
+        };
+        return "";
+    }
+
+    function has(key: String) -> bool { return me.get(key) != ""; }
+
+    function forget(key: String) -> int {
+        var kept: CacheEntry[] = [];
+        var n = 0;
+        for each e in (me.entries) {
+            if (e.key == key) { n = n + 1; } else { kept.push(e); };
+        };
+        me.entries = kept;
+        return n;
+    }
+
+    function flush() { me.entries = []; }
+    function count() -> int { return me.entries.length; }
+};
+
+function safe_key(key: String) -> String {
+    var out = "";
+    for each c in (key.toChar()) {
+        var n = ord(c);
+        var keep = (n >= 48 && n <= 57) || (n >= 65 && n <= 90) ||
+                   (n >= 97 && n <= 122) || n == 45 || n == 46 || n == 95;
+        if (keep) { out = out + c.toString(); } else { out = out + "_"; };
+    };
+    if (out == "") { out = "_"; };
+    return out;
+}
+
+export class FileCache {
+    public var dir: String;
+
+    function main(dir: String) { me.dir = dir; }
+
+    function path(key: String) -> String { return me.dir + "/" + safe_key(key) + ".cache"; }
+
+    function put(key: String, value: String, ttl_ms: int) -> FileCache {
+        fs.mkdir(me.dir);
+        var expires = now() + ttl_ms;
+        fs.writeFile(me.path(key), expires.toString() + "\n" + value);
+        return me;
+    }
+
+    function get(key: String) -> String {
+        var p = me.path(key);
+        if (!fs.exists(p)) { return ""; };
+        var raw = fs.readFile(p);
+        var nl = raw.indexOf("\n");
+        if (nl < 0) { fs.rm(p); return ""; };
+        var expires = int(raw.slice(0, nl));
+        if (expires <= now()) {
+            fs.rm(p);
+            return "";
+        };
+        return raw.slice(nl + 1, raw.length);
+    }
+
+    function has(key: String) -> bool { return me.get(key) != ""; }
+
+    function forget(key: String) -> int {
+        var p = me.path(key);
+        if (!fs.exists(p)) { return 0; };
+        fs.rm(p);
+        return 1;
+    }
+
+    function flush() {
+        if (!fs.exists(me.dir)) { return; };
+        var files = fs.listDir(me.dir);
+        for each f in (files) { fs.rm(me.dir + "/" + f); };
+    }
+};

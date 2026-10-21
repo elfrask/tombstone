@@ -20,6 +20,9 @@ from "./security" import Csrf, Gate, NotePolicy, CsrfMiddleware, RateEntry, Rate
 from "./action" import Action, Service;
 from "./resource" import Resource;
 from "./pagination" import PaginatedResource;
+from "./testing" import TestClient, TestResponse;
+from "./seeder" import Seeder;
+from "./cache" import Cache, CacheEntry, FileCache;
 
 from "./status" import HttpStatus;
 from "./router" import Router, Route, RouteMatch, route_matches;
@@ -65,6 +68,9 @@ export { Csrf, Gate, NotePolicy, CsrfMiddleware, RateEntry, RateLimiter, RateLim
 export { Action, Service };
 export { Resource };
 export { PaginatedResource };
+export { TestClient, TestResponse };
+export { Seeder };
+export { Cache, CacheEntry, FileCache };
 export { HttpStatus };
 export { Router, Route, RouteMatch, route_matches };
 export { ControllerRoute };

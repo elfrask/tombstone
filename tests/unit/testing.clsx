@@ -1,0 +1,36 @@
+from "tombstone" import App, Request, Response, TestClient;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var app = App();
+    app.get("/hello", (req: Request) -> Response {
+        return Response.text("hola");
+    });
+    app.post("/echo", (req: Request) -> Response {
+        return Response.json_response("{\"body\":\"" + req.body + "\"}");
+    });
+    app.get("/set", (req: Request) -> Response {
+        return Response.text("set").add_cookie("sid=abc; Path=/; HttpOnly");
+    });
+    app.get("/me", (req: Request) -> Response {
+        return Response.text(req.header("cookie"));
+    });
+
+    var client = TestClient(app);
+    var hello = client.get("/hello");
+    hello.assert_status(200).assert_contains("hola").assert_header("content-type", "text/plain; charset=utf-8");
+
+    var echo = client.post("/echo", "x=1");
+    echo.assert_status(200).assert_json("body", "x=1");
+
+    var set = client.get("/set");
+    set.assert_status(200);
+    check::assertEq("test.cookies", set.cookies.length, 1);
+    client.assert_cookie("sid");
+    client.get("/me").assert_contains("sid=abc");
+
+    if (check::fails() > 0) { return 1; };
+    return 0;
+};
