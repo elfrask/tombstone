@@ -27,6 +27,14 @@ export class RouteGroup {
     }
 
     function get(pattern: String, handler: (Request) -> Response) { me.add("GET", pattern, handler); }
+
+    function get_named(route_name: String, pattern: String, handler: (Request) -> Response) {
+        me.router.add_named("GET", me.prefix + pattern, route_name, handler);
+    }
+
+    function url(route_name: String, params: Record<String, String>) -> String {
+        return me.router.url(route_name, params);
+    }
     function post(pattern: String, handler: (Request) -> Response) { me.add("POST", pattern, handler); }
     function put(pattern: String, handler: (Request) -> Response) { me.add("PUT", pattern, handler); }
     function patch(pattern: String, handler: (Request) -> Response) { me.add("PATCH", pattern, handler); }

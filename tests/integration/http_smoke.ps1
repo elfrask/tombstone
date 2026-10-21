@@ -153,6 +153,10 @@ try {
         $r = CurlRaw "GET" "/api/notes" $null $null
         Check "GET /api/notes count" ($r -match '"count":1') $r
 
+        $r = CurlRaw "GET" "/api/notes/page" $null $null
+        Check "GET /api/notes/page status" ($r -match "HTTP/1\.1 200 OK") $r
+        Check "GET /api/notes/page meta" ($r -match '"meta":\{"page":1') $r
+
         $r = CurlRaw "DELETE" "/api/notes/$noteId" $null $null
         Check "DELETE /api/notes status" ($r -match "HTTP/1\.1 200 OK") $r
         Check "DELETE /api/notes body" ($r -match '"deleted":true') $r

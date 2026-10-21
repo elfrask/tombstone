@@ -1,7 +1,7 @@
 # src/controllers.clsx - Controladores del proyecto demo.
 #
 # El controller valida y mapea a DTOs; delega en Actions/Repository/Resource.
-from "tombstone" import Controller, Request, Response;
+from "tombstone" import Controller, PaginatedResource, Request, Response;
 from "./actions" import CreateNoteAction, DeleteNoteAction, RestoreNoteAction;
 from "./dtos" import NoteInput, RegisterUserInput;
 from "./repositories" import NoteRepository;
@@ -11,6 +11,12 @@ export class RegistrationController: Controller {
     function main(req: Request) {
         super.main(req);
     }
+
+    function handle() -> Response {
+        if (me.action_name == "store") { return me.store(); };
+        return me.error("accion no soportada", 500);
+    }
+
 
     function store() -> Response {
         var v = me.validate({
@@ -52,12 +58,29 @@ export class NotesController: Controller {
         me.note_resource = note_resource;
     }
 
+    function handle() -> Response {
+        if (me.action_name == "index") { return me.index(); };
+        if (me.action_name == "trashed") { return me.trashed(); };
+        if (me.action_name == "page") { return me.page(); };
+        if (me.action_name == "store") { return me.store(); };
+        if (me.action_name == "show") { return me.show(); };
+        if (me.action_name == "destroy") { return me.destroy(); };
+        if (me.action_name == "restore") { return me.restore(); };
+        return me.error("accion no soportada", 500);
+    }
+
     function index() -> Response {
         return me.ok({count: me.notes.count()});
     }
 
     function trashed() -> Response {
         return me.ok({count: me.notes.trashed_count()});
+    }
+
+    function page() -> Response {
+        var p = me.notes.paginate(1, 10);
+        var body = PaginatedResource(me.note_resource, p).to_json();
+        return Response.json_response(body);
     }
 
     function store() -> Response {

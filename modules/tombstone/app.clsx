@@ -34,6 +34,15 @@ export class App {
         return me;
     }
 
+    function get_named(route_name: String, pattern: String, handler: (Request) -> Response) -> App {
+        me.router.add_named("GET", pattern, route_name, handler);
+        return me;
+    }
+
+    function route(route_name: String, params: Record<String, String>) -> String {
+        return me.router.url(route_name, params);
+    }
+
     function post(pattern: String, handler: (Request) -> Response) -> App {
         me.router.post(pattern, handler);
         return me;

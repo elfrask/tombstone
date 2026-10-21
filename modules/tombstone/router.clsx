@@ -1,4 +1,4 @@
-# tombstone/router.clsx - Router con parámetros de ruta y middleware por ruta.
+# tombstone/router.clsx - Router con parámetros, opcionales, nombres y middleware.
 from "httpd" import Request, Response;
 from "./middleware" import Middleware;
 
@@ -17,43 +17,99 @@ export class Route {
     public var pattern: String;
     public var handler: (Request) -> Response;
     public var middlewares: Middleware[];
+    public var route_name: String;
 
     function main(http_method: String, pattern: String, handler: (Request) -> Response) {
         me.http_method = http_method;
         me.pattern = pattern;
         me.handler = handler;
         me.middlewares = [];
+        me.route_name = "";
     }
+}
+
+function is_param_seg(seg: String) -> bool {
+    return seg.length > 2 && seg[0] == "{" && seg[seg.length - 1] == "}";
+}
+
+function is_optional_seg(seg: String) -> bool {
+    if (!is_param_seg(seg)) { return false; };
+    return seg[seg.length - 2] == "?";
+}
+
+function param_name(seg: String) -> String {
+    var end = seg.length - 1;
+    if (seg[end - 1] == "?") { end = end - 1; };
+    return seg.slice(1, end);
+}
+
+function build_route_url(pattern: String, params: Record<String, String>) -> String {
+    var parts: String[] = [];
+    var segs = pattern.split("/");
+    for each seg in (segs) {
+        if (is_param_seg(seg)) {
+            var key = param_name(seg);
+            var val = "";
+            if (params.has(key)) { val = params[key]; };
+            if (is_optional_seg(seg) && val == "") { continue; };
+            parts.push(val);
+        } else {
+            parts.push(seg);
+        };
+    };
+    var out = "";
+    for each part and i in (parts) {
+        if (i > 0) { out = out + "/"; };
+        out = out + part;
+    };
+    return out;
 }
 
 export function route_matches(pattern: String, route_path: String) -> RouteMatch {
     var params: Record<String, String> = {};
     var pp = pattern.split("/");
     var sp = route_path.split("/");
-    if (pp.length != sp.length) {
+    var min_len = 0;
+    for each seg in (pp) {
+        if (!is_optional_seg(seg)) { min_len = min_len + 1; };
+    };
+    if (sp.length < min_len || sp.length > pp.length) {
         return RouteMatch(false, params);
-    }
+    };
 
     for each seg and i in (pp) {
-        if (seg.length > 2 && seg[0] == "{" && seg[seg.length - 1] == "}") {
-            var name = seg.slice(1, seg.length - 1);
-            params[name] = sp[i];
+        if (i >= sp.length) {
+            if (is_optional_seg(seg)) {
+                params[param_name(seg)] = "";
+                continue;
+            };
+            return RouteMatch(false, params);
+        };
+        if (is_param_seg(seg)) {
+            params[param_name(seg)] = sp[i];
         } elif (seg != sp[i]) {
             return RouteMatch(false, params);
         };
-    }
+    };
     return RouteMatch(true, params);
 }
 
 export class Router {
     public var routes: Route[];
 
-    function main() {
-        me.routes = [];
-    }
+    function main() { me.routes = []; }
 
     function add(http_method: String, pattern: String, handler: (Request) -> Response) {
         me.routes.push(Route(http_method, pattern, handler));
+    }
+
+    function add_named(
+        http_method: String, pattern: String, route_name: String,
+        handler: (Request) -> Response
+    ) {
+        var r = Route(http_method, pattern, handler);
+        r.route_name = route_name;
+        me.routes.push(r);
     }
 
     function add_with_middleware(
@@ -63,6 +119,15 @@ export class Router {
         var r = Route(http_method, pattern, handler);
         r.middlewares = middlewares;
         me.routes.push(r);
+    }
+
+    function url(route_name: String, params: Record<String, String>) -> String {
+        for each r in (me.routes) {
+            if (r.route_name == route_name) {
+                return build_route_url(r.pattern, params);
+            };
+        };
+        return "";
     }
 
     function get(pattern: String, handler: (Request) -> Response) { me.add("GET", pattern, handler); }
@@ -90,9 +155,7 @@ export class Router {
             };
         };
 
-        if (path_exists) {
-            return Response.status_only(405);
-        };
+        if (path_exists) { return Response.status_only(405); };
         return Response.not_found();
     }
 };

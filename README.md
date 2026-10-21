@@ -59,6 +59,7 @@ tombstone/
 │   │   └── action.clsx      # Action/Service
 │   │   ├── group.clsx        # RouteGroup (prefijo + middleware)
 │   │   ├── resource.clsx     # Resource (presentación JSON)
+│   │   ├── pagination.clsx   # PaginatedResource
 │   │   └── types/           # interfaces de props CMX (HTML + UI)
 │   └── tombstone-icons/     # iconos SVG para las vistas
 ├── src/
@@ -71,6 +72,7 @@ tombstone/
 │   ├── actions.clsx         # Create/Delete/RestoreNoteAction
 │   ├── services.clsx        # ApplicationServices + providers + bootstrap
 │   ├── resources.clsx       # NoteResource
+│   ├── scopes.clsx          # NoteScopes (query objects)
 │   ├── migrations.clsx      # esquema versionado del demo
 │   └── views.clsx           # páginas (Landing, Gallery) con <Componente />
 ├── public/                  # css / js / favicon servidos por /public
@@ -118,6 +120,7 @@ Rutas del demo:
 | GET | `/api/notes` | conteo de notas (Model, sin soft-deleted) |
 | POST | `/api/notes` | crea nota desde formulario (Model) |
 | GET | `/api/notes/trashed` | conteo de notas en la papelera |
+| GET | `/api/notes/page` | notas paginadas (`PaginatedResource`) |
 | DELETE | `/api/notes/{id}` | soft delete |
 | POST | `/api/notes/{id}/restore` | restaura una nota |
 | GET | `/api/notes/{id}` | nota por id (Model) |
@@ -158,7 +161,7 @@ powershell -File cls-repositories\tombstone\tests\db\run.ps1
 Cobertura actual: **10 tests unitarios PASS** (request/response/router/app,
 template, view, types, validation/form/multipart, cookies/CORS/JSON/static,
 status), **64 checks DB PASS** (Model CRUD + migraciones, relaciones, eventos,
-timestamps, soft deletes y factories) y **56 checks de integraci�n PASS**
+timestamps, soft deletes y factories) y **58 checks de integraci�n PASS**
 (landing, UI kit, API, formulario validado, Model SQLite + soft delete/restore,
 cookies, CORS, static, 404/405).
 
@@ -393,6 +396,7 @@ El demo separa controller, DTO, Action y Repository:
 
 - `ApplicationServices` (`src/services.clsx`) es el contenedor tipado:
 │   ├── resources.clsx       # NoteResource
+│   ├── scopes.clsx          # NoteScopes (query objects)
   `config`, `db`, `events`, `logger`, `notes`, `create_note`, `delete_note`,
   `restore_note`.
 - `ServiceProvider` expone `register(services)`/`boot(services)`; `bootstrap`
@@ -414,6 +418,7 @@ El demo separa controller, DTO, Action y Repository:
 - `Middleware`: `(Request) -> Response`; `status == 0` continúa.
 - `RouteGroup`: prefijo, verbos y middleware por ruta/grupo.
 - `Resource`: transforma `ModelRow` a `Record<String,String>`/colección.
+- `PaginatedResource`: serializa `Paginator` + `Resource` con `data`/`meta`.
 - `Request`: `http_method`, `path`, `query`, `query_param`, `headers`,
   `header`, `body`, `params`, `param`, `form`, `files`, `input`, `all`,
   `validate`, `validate_schema`, `file`, `has_file`.

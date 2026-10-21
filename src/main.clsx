@@ -22,7 +22,7 @@
 #   GET  /api/notes/{id}   nota por id (Model)
 #   GET  /public/*         archivos estáticos (fs del nodo)
 import "sqlite" as sqlite;
-from "tombstone" import App, Request, Response, CorsOptions, CookieOptions, Template;
+from "tombstone" import App, Controller, Request, Response, CorsOptions, CookieOptions, Template;
 from "tombstone" import render, json_response, json_response_raw, json_string_array;
 from "tombstone" import parse_cookies, serialize_cookie, system_pid, system_uptime_ms;
 from "tombstone" import Database, MigrationRunner, serve;
@@ -131,27 +131,24 @@ function main(args: String[]) -> int {
         return RegistrationController(req).store();
     });
 
-    # Model sobre SQLite en memoria.
     app.get("/api/notes", (req: Request) -> Response {
         return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).index();
     });
-
     app.post("/api/notes", (req: Request) -> Response {
         return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).store();
     });
-
     app.get("/api/notes/trashed", (req: Request) -> Response {
         return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).trashed();
     });
-
+    app.get("/api/notes/page", (req: Request) -> Response {
+        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).page();
+    });
     app.delete_route("/api/notes/{id}", (req: Request) -> Response {
         return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).destroy();
     });
-
     app.post("/api/notes/{id}/restore", (req: Request) -> Response {
         return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).restore();
     });
-
     app.get("/api/notes/{id}", (req: Request) -> Response {
         return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).show();
     });

@@ -1,5 +1,5 @@
 # src/repositories.clsx - Repositorio de notas sobre Model (capa de dominio).
-from "tombstone" import Model, ModelRow;
+from "tombstone" import Model, ModelRow, Paginator;
 from "./dtos" import NoteInput;
 
 export class NoteRepository {
@@ -16,6 +16,10 @@ export class NoteRepository {
 
     function create(input: NoteInput) -> ModelRow {
         return me.notes.create(input.to_record());
+    }
+
+    function paginate(page: int, per_page: int) -> Paginator {
+        return me.notes.paginate(page, per_page);
     }
 
     function delete(id: String) -> int { return me.notes.delete(id); }

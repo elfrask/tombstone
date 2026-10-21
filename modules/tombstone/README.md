@@ -38,6 +38,7 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 | `log.clsx` | `Logger` (niveles + buffer) |
 | `action.clsx` | `Action`, `Service` (marcadores de capa) |
 | `resource.clsx` | `Resource` (ModelRow -> JSON) |
+| `pagination.clsx` | `PaginatedResource` (data + meta) |
 | `types/*.clsx` | interfaces de props CMX (una por etiqueta HTML + UI) |
 | `mod.clsx` | barrel público (motor + tipos) |
 

@@ -1,0 +1,22 @@
+# src/scopes.clsx - Query objects nombrados para notas.
+from "tombstone" import Model, Query;
+
+export class NoteScopes {
+    public var model: Model;
+
+    function main(model: Model) {
+        me.model = model;
+    }
+
+    function recent(limit: int) -> Query {
+        return me.model.query().order_by("id", "desc").limit(limit);
+    }
+
+    function search(term: String) -> Query {
+        return me.model.query().where_like("title", "%" + term + "%");
+    }
+
+    function trashed() -> Query {
+        return me.model.only_trashed();
+    }
+};

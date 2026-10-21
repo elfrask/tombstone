@@ -24,6 +24,13 @@ function main(args: String[]) -> int {
     var nf = Response.not_found();
     check::assertTrue("res.404.status", nf.serialize().startsWith("HTTP/1.1 404 Not Found\r\n"));
 
+    var cookies = Response.text("ok");
+    cookies.add_cookie("a=1; Path=/");
+    cookies.add_cookie("b=2; Path=/; HttpOnly");
+    var cookieRaw = cookies.serialize();
+    check::assertTrue("res.cookies.a", cookieRaw.contains("set-cookie: a=1; Path=/\r\n"));
+    check::assertTrue("res.cookies.b", cookieRaw.contains("set-cookie: b=2; Path=/; HttpOnly\r\n"));
+
     if (check::fails() > 0) {
         return 1;
     };

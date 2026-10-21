@@ -46,6 +46,19 @@ function main(args: String[]) -> int {
     var blocked = groupedRouter.dispatch(Request.parse("GET /api/ping HTTP/1.1\r\nHost: x\r\nx-block: 1\r\n\r\n"));
     check::assertEq("router.group.middleware", blocked.status, 403);
 
+    var named = Router();
+    named.add_named("GET", "/users/{id}", "user.show", (req: Request) -> Response {
+        return Response.text("named");
+    });
+    check::assertEqStr("router.named.url", named.url("user.show", {id: "7"}), "/users/7");
+    named.get("/optional/{id?}", (req: Request) -> Response {
+        return Response.text("opt=" + req.param("id"));
+    });
+    var opt1 = named.dispatch(Request.parse("GET /optional HTTP/1.1\r\nHost: x\r\n\r\n"));
+    var opt2 = named.dispatch(Request.parse("GET /optional/9 HTTP/1.1\r\nHost: x\r\n\r\n"));
+    check::assertEqStr("router.optional.empty", opt1.body, "opt=");
+    check::assertEqStr("router.optional.id", opt2.body, "opt=9");
+
     if (check::fails() > 0) {
         return 1;
     };

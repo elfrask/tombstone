@@ -1,0 +1,27 @@
+# tombstone/pagination.clsx - Presenter JSON para un Paginator + Resource.
+from "./model" import Paginator;
+from "./resource" import Resource;
+from "./json" import json_encode;
+
+export class PaginatedResource {
+    public var resource: Resource;
+    public var paginator: Paginator;
+
+    function main(resource: Resource, paginator: Paginator) {
+        me.resource = resource;
+        me.paginator = paginator;
+    }
+
+    function to_json() -> String {
+        var data = "";
+        for each row and i in (me.paginator.data) {
+            if (i > 0) { data = data + ","; };
+            data = data + json_encode(me.resource.to_record(row));
+        };
+        var meta = "{\"page\":" + me.paginator.page.toString() +
+                   ",\"per_page\":" + me.paginator.per_page.toString() +
+                   ",\"total\":" + me.paginator.total.toString() +
+                   ",\"last_page\":" + me.paginator.last_page.toString() + "}";
+        return "{\"data\":[" + data + "],\"meta\":" + meta + "}";
+    }
+};
