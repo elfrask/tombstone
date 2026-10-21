@@ -1,6 +1,7 @@
 # tombstone/router.clsx - Router con parámetros, opcionales, nombres y middleware.
 from "httpd" import Request, Response;
 from "./middleware" import Middleware;
+from "./controller" import Controller;
 
 export class RouteMatch {
     public var matched: bool;
@@ -94,10 +95,28 @@ export function route_matches(pattern: String, route_path: String) -> RouteMatch
     return RouteMatch(true, params);
 }
 
+export class ControllerRoute {
+    public var http_method: String;
+    public var pattern: String;
+    public var action: String;
+    public var controller: Controller;
+
+    function main(http_method: String, pattern: String, action: String, controller: Controller) {
+        me.http_method = http_method;
+        me.pattern = pattern;
+        me.action = action;
+        me.controller = controller;
+    }
+};
+
 export class Router {
     public var routes: Route[];
+    public var controller_routes: ControllerRoute[];
 
-    function main() { me.routes = []; }
+    function main() {
+        me.routes = [];
+        me.controller_routes = [];
+    }
 
     function add(http_method: String, pattern: String, handler: (Request) -> Response) {
         me.routes.push(Route(http_method, pattern, handler));
@@ -110,6 +129,12 @@ export class Router {
         var r = Route(http_method, pattern, handler);
         r.route_name = route_name;
         me.routes.push(r);
+    }
+
+    function controller(
+        http_method: String, pattern: String, action: String, c: Controller
+    ) {
+        me.controller_routes.push(ControllerRoute(http_method, pattern, action, c));
     }
 
     function add_with_middleware(
@@ -151,6 +176,19 @@ export class Router {
                     };
                     var h = r.handler;
                     return h(req);
+                };
+            };
+        };
+
+        for each cr in (me.controller_routes) {
+            var cm = route_matches(cr.pattern, req.path);
+            if (cm.matched) {
+                path_exists = true;
+                if (cr.http_method == req.http_method) {
+                    req.params = cm.params;
+                    cr.controller.prepare(req);
+                    cr.controller.set_action(cr.action);
+                    return cr.controller.handle();
                 };
             };
         };

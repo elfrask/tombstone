@@ -17,19 +17,20 @@
 from "httpd" import Request, Response, FormFile, ValidationResult, Schema;
 from "./json" import json_encode;
 
-export class ControllerFactory {
-    function make(req: Request) -> Controller {
-        throw("ControllerFactory.make no implementado");
-    }
-};
-
 export class Controller {
+
     public var req: Request;
     public var action_name: String;
 
     function main(req: Request) {
         me.req = req;
         me.action_name = "";
+    }
+
+    function prepare(req: Request) -> Controller {
+        me.req = req;
+        me.action_name = "";
+        return me;
     }
 
     function set_action(action: String) -> Controller {

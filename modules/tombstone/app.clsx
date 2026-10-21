@@ -8,6 +8,7 @@ import "httpd" as httpd;
 from "./router" import Router;
 from "./group" import RouteGroup;
 from "./middleware" import Middleware;
+from "./controller" import Controller;
 from "./static" import StaticHandler;
 from "./cors" import CorsOptions, cors_apply;
 
@@ -71,6 +72,13 @@ export class App {
     # --- extensiones ------------------------------------------------------
     function use(mw_name: String, fn: (Request) -> Response) -> App {
         me.middlewares.push(Middleware(mw_name, fn));
+        return me;
+    }
+
+    function controller(
+        http_method: String, pattern: String, action: String, c: Controller
+    ) -> App {
+        me.router.controller(http_method, pattern, action, c);
         return me;
     }
 

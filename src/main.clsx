@@ -81,6 +81,14 @@ function main(args: String[]) -> int {
     MigrationRunner(db.orm).add(CreateInitialSchema()).run();
     var services: ApplicationServices = bootstrap(db, config);
     var note_resource = NoteResource();
+    var notes_controller = NotesController(
+        Request.parse("GET / HTTP/1.1\r\nHost: x\r\n\r\n"),
+        services.notes, services.create_note, services.delete_note,
+        services.restore_note, note_resource
+    );
+    var register_controller = RegistrationController(
+        Request.parse("POST / HTTP/1.1\r\nHost: x\r\n\r\n")
+    );
     var app = App();
     app.cors(CorsOptions());
     app.use("logging", (req: Request) -> Response {
@@ -127,31 +135,15 @@ function main(args: String[]) -> int {
     });
 
     # Formulario o JSON; Request.validate + Controller.
-    app.post("/api/register", (req: Request) -> Response {
-        return RegistrationController(req).store();
-    });
+    app.controller("POST", "/api/register", "store", register_controller);
 
-    app.get("/api/notes", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).index();
-    });
-    app.post("/api/notes", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).store();
-    });
-    app.get("/api/notes/trashed", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).trashed();
-    });
-    app.get("/api/notes/page", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).page();
-    });
-    app.delete_route("/api/notes/{id}", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).destroy();
-    });
-    app.post("/api/notes/{id}/restore", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).restore();
-    });
-    app.get("/api/notes/{id}", (req: Request) -> Response {
-        return NotesController(req, services.notes, services.create_note, services.delete_note, services.restore_note, note_resource).show();
-    });
+    app.controller("GET", "/api/notes", "index", notes_controller);
+    app.controller("POST", "/api/notes", "store", notes_controller);
+    app.controller("GET", "/api/notes/trashed", "trashed", notes_controller);
+    app.controller("GET", "/api/notes/page", "page", notes_controller);
+    app.controller("DELETE", "/api/notes/{id}", "destroy", notes_controller);
+    app.controller("POST", "/api/notes/{id}/restore", "restore", notes_controller);
+    app.controller("GET", "/api/notes/{id}", "show", notes_controller);
 
     app.get("/cookies", (req: Request) -> Response {
         var jar = parse_cookies(req.header("cookie"));

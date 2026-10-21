@@ -400,21 +400,26 @@ El demo separa controller, DTO, Action y Repository:
   `config`, `db`, `events`, `logger`, `notes`, `create_note`, `delete_note`,
   `restore_note`.
 - `ServiceProvider` expone `register(services)`/`boot(services)`; `bootstrap`
+- `App.controller(metodo, ruta, accion, controller)` usa `ControllerRoute`;
   construye el bus, comparte `db.set_events(events)` y registra providers.
 - `NoteRepository` envuelve `Model` y es la única puerta de datos para las
   Actions.
 - `NoteInput`/`RegisterUserInput` son DTOs explícitos; `NotesController` valida
   y delega en Actions.
 - `EventBus` emite `created/updated/deleted/restored` desde `Model`; los
+- `NoteScopes` agrupa query objects (`recent`, `search`, `trashed`).
+- `PaginatedResource` serializa `data` + `meta` para `/api/notes/page`.
   listeners del `DomainProvider` los loguean.
 - `ModelRow.save()`/`ModelRow.delete()` no emiten eventos (solo las operaciones
   de `Model`); documentado como límite actual.
 
 ### API
 
-- `App`: `get/post/put/patch/delete_route/options`, `use`, `serve_static`,
+- `App`: `get/post/put/patch/delete_route/options`, `controller`, `group`, `route`,
+  `use`, `serve_static`,
   `cors`, `handle(raw)`, `dispatch(Request)`, `serve(host, port)`.
-- `Router`: `add`, verbos, `dispatch(Request)`; `{param}` + 404/405.
+- `Router`: `add`, `add_named`, `url`, `controller`, verbos, `dispatch(Request)`;
+  `{param}`, `{id?}`, named routes y 404/405.
 - `Middleware`: `(Request) -> Response`; `status == 0` continúa.
 - `RouteGroup`: prefijo, verbos y middleware por ruta/grupo.
 - `Resource`: transforma `ModelRow` a `Record<String,String>`/colección.
@@ -424,7 +429,8 @@ El demo separa controller, DTO, Action y Repository:
   `validate`, `validate_schema`, `file`, `has_file`.
 - `ValidationResult`: `ok`, `failed`, `first`, `errors`, `data`;
   `field()`/`schema()` para armar reglas; `validate_data(data, rules)`.
-- `Controller`: `input/all/param/file`, `validate`, `validate_schema`,
+- `Controller`: `input/all/param/file`, `validate`, `validate_schema`, `prepare`,
+  `set_action`, `handle`,
   `json/ok/created/accepted/no_content/invalid/error/redirect`.
 - `Database`: `connect/close/exec/query/begin/commit/rollback/table`,
   `table_with_key`, `schema`.
@@ -482,10 +488,10 @@ Model, `modules/orm`/`modules/sqlite`; `static` usa `fs` del nodo.
 
 - HTTP/1.1 sin `Transfer-Encoding: chunked` ni keep-alive (una request por
   conexión, `Connection: close`).
-- `headers` es `Record<String, String>`: el último valor gana; `Set-Cookie`
-  múltiple queda pendiente.
-- Router: solo params requeridos `{id}`. Faltan constraints (`where`),
-  opcionales (`{id?}`), named routes y controllers como clases.
+- `headers` es `Record<String, String>`: headers simples usan el último valor;
+  los `Set-Cookie` múltiples usan `Response.add_cookie`.
+- Router: faltan constraints (`where`); `{id?}`, named routes y controllers
+  como clases ya están implementados.
 - CMX: un child que es `Array` no se expande solo; usar `renderEach` + `raw`.
   Los componentes uppercase deben devolver `Cmx` (para HTML crudo: `raw`).
 - Spread de props: el source debe ser `Record<String, Value>`; un interface

@@ -96,6 +96,9 @@ Reglas: `required`, `nullable`, `string`, `int`, `float`, `bool`, `email`,
 También hay builder chainable: `schema({name: field().required().min(2).to_rule()})`.
 
 ## Model, migraciones, relaciones y factories
+Controllers como clases: `app.controller("GET", "/notes", "index", notesController)`;
+`Router` guarda un `ControllerRoute` y llama `prepare/set_action/handle` sin closure.
+
 
 `Database` recibe un `orm::Driver`; `Model` es agnóstico al motor. El demo usa
 SQLite y migraciones versionadas:
