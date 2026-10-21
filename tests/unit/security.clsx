@@ -1,13 +1,17 @@
-from "tombstone" import Csrf, RateLimiter, RateLimitMiddleware, Request, Session, SessionStore, hash_password, verify_password;
+from "tombstone" import Csrf, RateLimiter, RateLimitMiddleware, Request, Session, SessionStore, hash_password, password_needs_rehash, verify_password;
 import "check" as check;
 
 function main(args: String[]) -> int {
     check::reset();
 
     var h = hash_password("secret123");
-    check::assertTrue("security.hash.format", h.startsWith("sha256$1000$"));
+    check::assertTrue("security.hash.format", h.startsWith("$" + "argon2id" + "$"));
     check::assertTrue("security.hash.verify", verify_password("secret123", h));
     check::assertTrue("security.hash.reject", !verify_password("bad", h));
+    check::assertTrue("security.hash.current", !password_needs_rehash(h));
+    var legacy = "sha256" + "$" + "1000" + "$" + "a805b8c48f4f90c17927a39db2aada47" + "$" + "0a875bea0bda92a1d4d35b976b73b27b2d9cf84dfb8b40a99480489c5fe4283d";
+    check::assertTrue("security.hash.legacy", verify_password("secret123", legacy));
+    check::assertTrue("security.hash.legacy.rehash", password_needs_rehash(legacy));
 
     var store = SessionStore();
     var s = store.create();

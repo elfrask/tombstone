@@ -37,7 +37,7 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 | `event.clsx` | `Event`, `EventBus`, `Listener` |
 | `log.clsx` | `Logger` (niveles + buffer) |
 | `action.clsx` | `Action`, `Service` (marcadores de capa) |
-| `hash.clsx` | SHA-256 + password hash (dev) |
+| `hash.clsx` | Argon2id + compatibilidad SHA-256 legado |
 | `session.clsx` | `Session`, `SessionStore`, `DbSessionStore` |
 | `auth.clsx` | `AuthGuard` |
 | `security.clsx` | `Csrf`, `CsrfMiddleware`, `NotePolicy`, `Gate`, `RateLimiter`, `RateLimitMiddleware` |
@@ -162,8 +162,9 @@ Actions para el flujo `Controller -> DTO -> Action -> Repository -> Model`.
 
 ## Seguridad
 
-- `hash_password`/`verify_password`: SHA-256 + salt e iteraciones, salt desde
-  `modules/csprng` (BCryptGenRandom / `/dev/urandom`). No es Argon2.
+- `hash_password`/`verify_password`: Argon2id (`libargon2`) con salt desde
+  `modules/csprng`. Los hashes `sha256$...` legados se verifican y se rehashean
+  al iniciar sesión.
 - `SessionStore` en memoria; `DbSessionStore` persiste en `sessions` con
   expiración (24 h).
 - `AuthGuard.login(email, password)` valida `users.password_hash`, crea sesión

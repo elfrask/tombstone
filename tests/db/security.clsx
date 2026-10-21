@@ -1,4 +1,4 @@
-from "tombstone" import Csrf, CsrfMiddleware, Database, DbSessionStore, NotePolicy, Request;
+from "tombstone" import AuthGuard, Csrf, CsrfMiddleware, Database, DbSessionStore, NotePolicy, Request;
 import "sqlite" as sqlite;
 import "check" as check;
 
@@ -13,6 +13,11 @@ function main(args: String[]) -> int {
     var db = Database(sqlite::SqliteDriver());
     db.connect(":memory:");
     var schema = db.schema();
+    var users = schema.blueprint("users");
+    users.id();
+    users.string("email");
+    users.string("password_hash");
+    schema.create(users);
     var s = schema.blueprint("sessions");
     s.id();
     s.string("token").unique();
@@ -39,7 +44,16 @@ function main(args: String[]) -> int {
     var get = req("GET", "/api/me", cookie, "");
     check::assertEq("db.security.csrf.get", mw.check(get).status, 0);
 
+    var legacy = "sha256" + "$" + "1000" + "$" + "a805b8c48f4f90c17927a39db2aada47" + "$" + "0a875bea0bda92a1d4d35b976b73b27b2d9cf84dfb8b40a99480489c5fe4283d";
+    var user = db.table("users").create({email: "legacy@example.com", password_hash: legacy});
+    var auth = AuthGuard(db.table("users"), store);
+    var login = auth.login("legacy@example.com", "secret123");
+    check::assertTrue("db.security.auth.legacy.login", login.valid());
+    var rehashed = db.table("users").find(user.get("id"));
+    check::assertTrue("db.security.auth.rehash", rehashed.get("password_hash").startsWith("$" + "argon2id" + "$"));
+
     store.destroy(session.id);
+    store.destroy(login.id);
     check::assertEq("db.security.session.destroy", store.count(), 0);
     db.close();
     if (check::fails() > 0) { return 1; };

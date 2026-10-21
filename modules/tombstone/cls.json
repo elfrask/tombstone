@@ -4,5 +4,9 @@
   "description": "Tombstone: framework web para CLS (motor)",
   "export": {
     "entry": "mod.clsx"
+  },
+  "dependencies": {
+    "argon2": "^1.0.0",
+    "csprng": "^0.1.0"
   }
 }

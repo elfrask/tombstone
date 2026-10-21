@@ -1,9 +1,10 @@
-# tombstone/hash.clsx - SHA-256 + hashing de passwords (dev)
+# tombstone/hash.clsx - Argon2id + compatibilidad SHA-256 legado
 #
 # Origen: adaptado de examples/pkgcheck/src/sha256.clsx.
-# password hash = sha256$iter$salt$digest (iteraciones de SHA-256; no Argon2).
+# password hash = Argon2id (libargon2); sha256$... se acepta solo para migrar.
 # Salt/tokens: CSPRNG del sistema (`modules/csprng`).
 import "csprng" as csprng;
+import "argon2" as argon2;
 
 # sha256.clsx - SHA-256 (FIPS 180-4) en CLS puro (0 FFI). Prueba #8 (pkgcheck).
 #
@@ -146,7 +147,7 @@ function sha256Hex(msg: String) -> String {
     return toHex(sha256Bytes(msg.toBytes()));
 }
 
-# --- password hashing (demo; no Argon2) -----------------------------------
+# --- password hashing: Argon2id + compatibilidad SHA-256 ------------------
 
 function derive(password: String, salt: String, rounds: int) -> String {
     var h = sha256Hex(salt + ":" + password);
@@ -159,10 +160,20 @@ function derive(password: String, salt: String, rounds: int) -> String {
 }
 export function hash_password(password: String) -> String {
     var salt = csprng::random_hex(16);
-    return "sha256$1000$" + salt + "$" + derive(password, salt, 1000);
+    return argon2::hash_encoded(password, salt);
+}
+
+export function password_needs_rehash(encoded: String) -> bool {
+    var prefix = "$" + "argon2id" + "$";
+    if (!encoded.startsWith(prefix)) { return true; };
+    return argon2::needs_rehash(encoded);
 }
 
 export function verify_password(password: String, encoded: String) -> bool {
+    var prefix = "$" + "argon2id" + "$";
+    if (encoded.startsWith(prefix)) {
+        return argon2::verify(encoded, password);
+    };
     var parts = encoded.split("$");
     if (parts.length != 4 || parts[0] != "sha256") { return false; };
     var salt = parts[2];

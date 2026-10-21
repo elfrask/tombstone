@@ -1,7 +1,7 @@
 # tombstone/auth.clsx - Guard de sesión sobre users/password_hash.
 from "./model" import Model, ModelRow;
 from "./session" import Session, DbSessionStore;
-from "./hash" import verify_password;
+from "./hash" import verify_password, hash_password, password_needs_rehash;
 
 export class AuthGuard {
     public var users: Model;
@@ -16,6 +16,10 @@ export class AuthGuard {
         var row = me.users.first_where("email", email);
         if (!row.exists) { return Session(""); };
         if (!verify_password(password, row.get("password_hash"))) { return Session(""); };
+        if (password_needs_rehash(row.get("password_hash"))) {
+            row.set("password_hash", hash_password(password));
+            row.save();
+        };
         var s = me.sessions.create();
         s.set("user_id", row.get("id"));
         me.sessions.persist(s);

@@ -177,7 +177,7 @@ powershell -File cls-repositories\tombstone\tests\db\run.ps1
 
 Cobertura actual: **11 tests unitarios PASS** (request/response/router/app,
 template, view, types, validation/form/multipart, cookies/CORS/JSON/static,
-status), **73 checks DB PASS** (Model CRUD + migraciones, relaciones, eventos,
+status), **75 checks DB PASS** (Model CRUD + migraciones, relaciones, eventos,
 timestamps, soft deletes, factories, sessions/CSRF y policies) y **70 checks de
 integración PASS** (landing, UI kit, API, auth/sesión, CSRF, rate limit,
 Model SQLite + soft delete/restore, cookies, CORS, static, 404/405).
@@ -465,7 +465,7 @@ El demo separa controller, DTO, Action y Repository:
   `force_delete`, `restore`, `with_trashed`, `only_trashed`, relaciones,
   `where`, `paginate`, agregados, ...); `ModelRow`/`Query`/`Paginator`.
 - `Event`/`EventBus`/`Listener`: eventos síncronos y model events.
-- `hash_password`/`verify_password`: SHA-256 + salt con CSPRNG (`modules/csprng`).
+- `hash_password`/`verify_password`: Argon2id (`libargon2`) con salt CSPRNG (`modules/csprng`); acepta `sha256$...` legado y rehashea al login.
 - `Session`/`SessionStore`: store en memoria; `DbSessionStore`: tabla `sessions`.
 - `AuthGuard`: login/logout/user/check/guest sobre `users.password_hash`.
 - `Csrf`/`CsrfMiddleware`: token por sesión, header o campo `_csrf`.
@@ -522,8 +522,8 @@ Model, `modules/orm`/`modules/sqlite`; `static` usa `fs` del nodo.
 
 - HTTP/1.1 sin `Transfer-Encoding: chunked` ni keep-alive (una request por
   conexión, `Connection: close`).
-- Auth demo: password hash SHA-256 iterado con salt y CSPRNG del sistema; no es
-  Argon2/PBKDF2. Para producción endurecer el KDF.
+- Auth: password hash Argon2id (`t=2`, `m=19456`, `p=1`) con salt CSPRNG y
+  rehash automático de hashes `sha256$...` legados.
 - Sesiones persistentes en SQLite; `TOMBSTONE_SECURE_COOKIE=1` activa `Secure`
   (requiere HTTPS). CSRF se exige con cookie de sesión en métodos mutantes.
 - `headers` es `Record<String, String>`: headers simples usan el último valor;
