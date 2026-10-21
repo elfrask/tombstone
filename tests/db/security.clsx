@@ -1,0 +1,47 @@
+from "tombstone" import Csrf, CsrfMiddleware, Database, DbSessionStore, NotePolicy, Request;
+import "sqlite" as sqlite;
+import "check" as check;
+
+function req(verb: String, route: String, headers: String, body: String) -> Request {
+    var raw = verb + " " + route + " HTTP/1.1\r\nHost: x\r\n" + headers +
+              "Content-Length: " + body.length.toString() + "\r\n\r\n" + body;
+    return Request.parse(raw);
+};
+
+function main(args: String[]) -> int {
+    check::reset();
+    var db = Database(sqlite::SqliteDriver());
+    db.connect(":memory:");
+    var schema = db.schema();
+    var s = schema.blueprint("sessions");
+    s.id();
+    s.string("token").unique();
+    s.text("data").nullable();
+    s.integer("expires_at");
+    schema.create(s);
+
+    var store = DbSessionStore(db.table_with_key("sessions", "token"));
+    var session = store.create();
+    var csrf = Csrf();
+    var token = csrf.token(session);
+    store.persist(session);
+    check::assertTrue("db.security.session.persist", store.find(session.id).get("csrf") == token);
+    check::assertTrue("db.security.session.count", store.count() == 1);
+
+    var mw = CsrfMiddleware(store, csrf);
+    var cookie = "Cookie: sid=" + session.id + "\r\n";
+    var bad = req("POST", "/api/logout", cookie, "");
+    check::assertEq("db.security.csrf.missing", mw.check(bad).status, 403);
+    var good = req("POST", "/api/logout", cookie + "X-CSRF-Token: " + token + "\r\n", "");
+    check::assertEq("db.security.csrf.header", mw.check(good).status, 0);
+    var form = req("POST", "/api/logout", cookie + "Content-Type: application/x-www-form-urlencoded\r\n", "_csrf=" + token);
+    check::assertEq("db.security.csrf.form", mw.check(form).status, 0);
+    var get = req("GET", "/api/me", cookie, "");
+    check::assertEq("db.security.csrf.get", mw.check(get).status, 0);
+
+    store.destroy(session.id);
+    check::assertEq("db.security.session.destroy", store.count(), 0);
+    db.close();
+    if (check::fails() > 0) { return 1; };
+    return 0;
+};

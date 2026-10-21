@@ -1,5 +1,5 @@
 # src/services.clsx - Contenedor tipado, providers y bootstrap del demo.
-from "tombstone" import AuthGuard, Database, Event, EventBus, Logger, RateLimiter, SessionStore;
+from "tombstone" import AuthGuard, Csrf, CsrfMiddleware, Database, DbSessionStore, Event, EventBus, Logger, NotePolicy, RateLimiter, RateLimitMiddleware;
 from "./config" import AppConfig;
 from "./repositories" import NoteRepository, UserRepository;
 from "./actions" import CreateNoteAction, DeleteNoteAction, RestoreNoteAction;
@@ -9,10 +9,15 @@ export class ApplicationServices {
     public var db: Database;
     public var events: EventBus;
     public var logger: Logger;
-    public var sessions: SessionStore;
+    public var sessions: DbSessionStore;
     public var users: UserRepository;
     public var auth: AuthGuard;
     public var limiter: RateLimiter;
+    public var http_limiter: RateLimiter;
+    public var csrf: Csrf;
+    public var csrf_middleware: CsrfMiddleware;
+    public var rate_middleware: RateLimitMiddleware;
+    public var note_policy: NotePolicy;
     public var notes: NoteRepository;
     public var create_note: CreateNoteAction;
     public var delete_note: DeleteNoteAction;
@@ -23,10 +28,15 @@ export class ApplicationServices {
         me.db = db;
         me.events = events;
         me.logger = Logger(config.log_level);
-        me.sessions = SessionStore();
+        me.sessions = DbSessionStore(db.table_with_key("sessions", "token"));
         me.users = UserRepository(db.table("users").timestamps());
         me.auth = AuthGuard(me.users.users, me.sessions);
         me.limiter = RateLimiter();
+        me.http_limiter = RateLimiter();
+        me.csrf = Csrf();
+        me.csrf_middleware = CsrfMiddleware(me.sessions, me.csrf);
+        me.rate_middleware = RateLimitMiddleware(me.http_limiter, 300, 60000);
+        me.note_policy = NotePolicy();
         me.notes = NoteRepository(db.table("notes").timestamps().soft_deletes());
         me.create_note = CreateNoteAction(me.notes);
         me.delete_note = DeleteNoteAction(me.notes);

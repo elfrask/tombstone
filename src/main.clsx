@@ -30,7 +30,7 @@ from "./config" import load_config;
 from "./services" import bootstrap, ApplicationServices;
 from "./resources" import NoteResource;
 from "./controllers" import RegistrationController, NotesController, AuthController;
-from "./migrations" import CreateInitialSchema;
+from "./migrations" import CreateInitialSchema, CreateSessions, AddUserRole;
 from "./views" import Landing, LandingPageProps, Gallery, GalleryPageProps;
 
 # Los shims de `fs` y `socket` se resuelven relativos al CWD: este demo se
@@ -78,23 +78,28 @@ function main(args: String[]) -> int {
     var config = load_config();
     var db = Database(sqlite::SqliteDriver());
     db.connect(config.db_path);
-    MigrationRunner(db.orm).add(CreateInitialSchema()).run();
+    MigrationRunner(db.orm).add(CreateInitialSchema()).add(CreateSessions()).add(AddUserRole()).run();
     var services: ApplicationServices = bootstrap(db, config);
     var note_resource = NoteResource();
     var notes_controller = NotesController(
         Request.parse("GET / HTTP/1.1\r\nHost: x\r\n\r\n"),
         services.notes, services.create_note, services.delete_note,
-        services.restore_note, note_resource
+        services.restore_note, note_resource, services.auth, services.note_policy
     );
     var register_controller = RegistrationController(
         Request.parse("POST / HTTP/1.1\r\nHost: x\r\n\r\n"), services.users
     );
     var auth_controller = AuthController(
-        Request.parse("GET / HTTP/1.1\r\nHost: x\r\n\r\n"), services.auth, services.limiter
+        Request.parse("GET / HTTP/1.1\r\nHost: x\r\n\r\n"), services.auth,
+        services.limiter, services.csrf, config.session_secure
     );
     var app = App();
     app.cors(CorsOptions());
-    app.use("logging", (req: Request) -> Response {
+    app.use("pipeline", (req: Request) -> Response {
+        var limited = services.rate_middleware.check(req);
+        if (limited.status != 0) { return limited; };
+        var secured = services.csrf_middleware.check(req);
+        if (secured.status != 0) { return secured; };
         services.logger.info("-> " + req.http_method + " " + req.path);
         return Response.status_only(0);
     });
@@ -140,6 +145,7 @@ function main(args: String[]) -> int {
     # Formulario o JSON; Request.validate + Controller.
     app.controller("POST", "/api/register", "store", register_controller);
     app.controller("POST", "/api/login", "login", auth_controller);
+    app.controller("GET", "/api/csrf", "csrf", auth_controller);
     app.controller("GET", "/api/me", "me", auth_controller);
     app.controller("POST", "/api/logout", "logout", auth_controller);
 

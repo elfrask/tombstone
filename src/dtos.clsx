@@ -18,13 +18,15 @@ export class RegisterUserInput {
 
 export class NoteInput {
     public var title: String;
+    public var user_id: String;
 
-    function main(title: String) {
+    function main(title: String, user_id: String) {
         me.title = title;
+        me.user_id = user_id;
     }
 
     function to_record() -> Record<String, String> {
-        var r: Record<String, String> = {title: me.title};
+        var r: Record<String, String> = {title: me.title, user_id: me.user_id};
         return r;
     }
 };

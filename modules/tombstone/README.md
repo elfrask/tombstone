@@ -38,9 +38,9 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 | `log.clsx` | `Logger` (niveles + buffer) |
 | `action.clsx` | `Action`, `Service` (marcadores de capa) |
 | `hash.clsx` | SHA-256 + password hash (dev) |
-| `session.clsx` | `Session`, `SessionStore` |
+| `session.clsx` | `Session`, `SessionStore`, `DbSessionStore` |
 | `auth.clsx` | `AuthGuard` |
-| `security.clsx` | `Csrf`, `Gate`, `RateLimiter` |
+| `security.clsx` | `Csrf`, `CsrfMiddleware`, `NotePolicy`, `Gate`, `RateLimiter`, `RateLimitMiddleware` |
 | `resource.clsx` | `Resource` (ModelRow -> JSON) |
 | `pagination.clsx` | `PaginatedResource` (data + meta) |
 | `types/*.clsx` | interfaces de props CMX (una por etiqueta HTML + UI) |
@@ -160,15 +160,19 @@ pueden cancelar con `e.cancel()` (lanza error). Compartir un bus:
 (`register`/`boot`), `NoteRepository`, `NoteInput`/`RegisterUserInput` y
 Actions para el flujo `Controller -> DTO -> Action -> Repository -> Model`.
 
-## Seguridad (dev)
+## Seguridad
 
-- `hash_password`/`verify_password` usan SHA-256 + salt e iteraciones; **no**
-  Argon2 y el salt/token usa `math.random` (LCG), no CSPRNG.
-- `Session`/`SessionStore` guardan sesiones en memoria.
-- `AuthGuard.login(email, password)` valida `users.password_hash` y crea sesión;
-  `user(session_id)` y `logout`.
-- `Csrf` emite/valida token por `Session`; `Gate` es una policy base; `RateLimiter`
-  limita por clave/ventana (el demo lo usa en `/api/login`).
+- `hash_password`/`verify_password`: SHA-256 + salt e iteraciones, salt desde
+  `modules/csprng` (BCryptGenRandom / `/dev/urandom`). No es Argon2.
+- `SessionStore` en memoria; `DbSessionStore` persiste en `sessions` con
+  expiración (24 h).
+- `AuthGuard.login(email, password)` valida `users.password_hash`, crea sesión
+  y rota la anterior; `user/check/guest/logout`.
+- `Csrf` emite/valida token por sesión; `CsrfMiddleware` exige header
+  `X-CSRF-Token` o campo `_csrf` en métodos mutantes con cookie.
+- `NotePolicy` aplica owner/admin por recurso.
+- `RateLimiter` por clave/ventana; `RateLimitMiddleware` limita HTTP global
+  (429 + `Retry-After`). Login usa además 5/min.
 
 ## Uso
 

@@ -7,6 +7,7 @@ export class AppConfig {
     public var debug: bool;
     public var db_path: String;
     public var log_level: String;
+    public var session_secure: bool;
 
     function main() {
         me.app_name = "Tombstone";
@@ -14,6 +15,7 @@ export class AppConfig {
         me.debug = true;
         me.db_path = ":memory:";
         me.log_level = "info";
+        me.session_secure = false;
     }
 };
 
@@ -25,6 +27,8 @@ export function load_config() -> AppConfig {
     if (db != "") { c.db_path = db; };
     var level = system_env("TOMBSTONE_LOG_LEVEL");
     if (level != "") { c.log_level = level; };
+    var secure = system_env("TOMBSTONE_SECURE_COOKIE");
+    if (secure == "1" || secure == "true") { c.session_secure = true; };
     c.debug = c.environment != "production";
     return c;
 };

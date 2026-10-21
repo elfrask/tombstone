@@ -11,6 +11,7 @@ export class CreateInitialSchema: Migration {
         users.id();
         users.string("name");
         users.string("email").unique();
+        users.string("role").with_default("user");
         users.string("password_hash").nullable();
         users.timestamps();
         schema.create(users);
@@ -28,5 +29,41 @@ export class CreateInitialSchema: Migration {
     function down(schema: DbSchema) -> int {
         schema.drop("notes");
         return schema.drop("users");
+    }
+};
+
+export class CreateSessions: Migration {
+    function main() {
+        super.main("2026_10_21_000001_create_sessions");
+    }
+
+    function up(schema: DbSchema) -> int {
+        var sessions = schema.blueprint("sessions");
+        sessions.id();
+        sessions.string("token").unique();
+        sessions.text("data").nullable();
+        sessions.integer("expires_at");
+        sessions.timestamps();
+        return schema.create(sessions);
+    }
+
+    function down(schema: DbSchema) -> int {
+        return schema.drop("sessions");
+    }
+};
+export class AddUserRole: Migration {
+    function main() {
+        super.main("2026_10_21_000002_add_user_role");
+    }
+
+    function up(schema: DbSchema) -> int {
+        if (schema.has_column("users", "role")) { return 0; };
+        var users = schema.blueprint("users");
+        users.string("role").with_default("user");
+        return schema.alter(users);
+    }
+
+    function down(schema: DbSchema) -> int {
+        return 0;
     }
 };

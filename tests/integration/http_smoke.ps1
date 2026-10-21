@@ -139,9 +139,20 @@ try {
         Check "POST /api/login status" ($r -match "HTTP/1\.1 200 OK") $r
         $sid = [regex]::Match($r, 'set-cookie: sid=([^;]+)').Groups[1].Value
         Check "POST /api/login cookie" ($sid -ne "") $r
+        $csrf = [regex]::Match($r, 'x-csrf-token: ([0-9a-f]+)').Groups[1].Value
+        Check "POST /api/login csrf header" ($csrf -ne "") $r
         $r = CurlRaw "GET" "/api/me" $null @("Cookie: sid=$sid")
         Check "GET /api/me status" ($r -match "HTTP/1\.1 200 OK") $r
         Check "GET /api/me email" ($r -match '"email":"ana@example.com"') $r
+        $r = CurlRaw "POST" "/api/logout" $null @("Cookie: sid=$sid")
+        Check "POST /api/logout requires csrf" ($r -match "HTTP/1\.1 403 Forbidden") $r
+        $r = CurlRaw "GET" "/api/csrf" $null @("Cookie: sid=$sid")
+        Check "GET /api/csrf status" ($r -match "HTTP/1\.1 200 OK") $r
+        Check "GET /api/csrf token" ($r -match '"token":"[0-9a-f]+"') $r
+        $r = CurlRaw "POST" "/api/logout" $null @("Cookie: sid=$sid", "X-CSRF-Token: $csrf")
+        Check "POST /api/logout status" ($r -match "HTTP/1\.1 200 OK") $r
+        $r = CurlRaw "GET" "/api/me" $null @("Cookie: sid=$sid")
+        Check "GET /api/me after logout" ($r -match "HTTP/1\.1 401 Unauthorized") $r
         $r = CurlRaw "POST" "/api/login" "email=ana%40example.com&password=bad" @("Content-Type: application/x-www-form-urlencoded")
         Check "POST /api/login invalid" ($r -match "HTTP/1\.1 401 Unauthorized") $r
         for ($i = 0; $i -lt 3; $i++) {

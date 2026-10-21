@@ -1,7 +1,9 @@
 # tombstone/security.clsx - CSRF, policies/gates y rate limiting.
 from "./hash" import token_hex;
 from "./model" import ModelRow;
-from "./session" import Session;
+from "httpd" import Request, Response;
+from "./cookies" import parse_cookies;
+from "./session" import Session, DbSessionStore;
 
 export class Csrf {
     function token(session: Session) -> String {
@@ -67,4 +69,71 @@ export class RateLimiter {
     }
 
     function clear() { me.entries = []; }
+};
+# Policy de recurso: owner o admin. `view`/`update`/`delete` comparten la regla.
+export class NotePolicy {
+    function allows(user: ModelRow, action: String, note: ModelRow) -> bool {
+        if (!user.exists || !note.exists) { return false; };
+        if (user.get("role") == "admin") { return true; };
+        var owner = note.get("user_id");
+        return owner != "" && owner == user.get("id");
+    }
+};
+
+# Middleware CSRF: exige token para métodos unsafe cuando hay cookie de sesión.
+# Login/register quedan exentos (no hay sesión previa). GET/HEAD/OPTIONS pasan.
+export class CsrfMiddleware {
+    public var sessions: DbSessionStore;
+    public var csrf: Csrf;
+
+    function main(sessions: DbSessionStore, csrf: Csrf) {
+        me.sessions = sessions;
+        me.csrf = csrf;
+    }
+
+    function check(req: Request) -> Response {
+        if (req.http_method == "GET" || req.http_method == "HEAD" ||
+            req.http_method == "OPTIONS") {
+            return Response.status_only(0);
+        };
+        if (req.path == "/api/login" || req.path == "/api/register") {
+            return Response.status_only(0);
+        };
+        var jar = parse_cookies(req.header("cookie"));
+        var sid = "";
+        if (jar.has("sid")) { sid = jar["sid"]; };
+        if (sid == "") { return Response.status_only(0); };
+        var s = me.sessions.find(sid);
+        if (!s.valid()) { return Response(403, "403 Forbidden"); };
+        var token = req.header("x-csrf-token");
+        if (token == "") { token = req.input("_csrf"); };
+        if (!me.csrf.verify(s, token)) {
+            return Response(403, "403 Forbidden");
+        };
+        return Response.status_only(0);
+    }
+};
+
+# Rate limit HTTP global por IP (configurable). El login tiene además su límite.
+export class RateLimitMiddleware {
+    public var limiter: RateLimiter;
+    public var limit: int;
+    public var window_ms: int;
+
+    function main(limiter: RateLimiter, limit: int, window_ms: int) {
+        me.limiter = limiter;
+        me.limit = limit;
+        me.window_ms = window_ms;
+    }
+
+    function check(req: Request) -> Response {
+        var key = req.header("x-forwarded-for");
+        if (key == "") { key = "local"; };
+        if (!me.limiter.allow("http:" + key, me.limit, me.window_ms)) {
+            var res = Response(429, "429 Too Many Requests");
+            res.headers["retry-after"] = (me.window_ms / 1000).toString();
+            return res;
+        };
+        return Response.status_only(0);
+    }
 };

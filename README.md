@@ -22,7 +22,8 @@ Fase 0 completa y ampliada:
 - Formularios: urlencoded, multipart (campos + `FormFile`) y JSON en `Request`.
 - Validación de request: reglas pipe + builder `field()/schema()`; `Controller`.
 - Model: `Model/Query/ModelRow` sobre `modules/orm`; SQLite en el demo.
-- Seguridad: password hashing, sesiones, `AuthGuard`, CSRF, Gate y rate limiter.
+- Seguridad: password hashing con CSPRNG, sesiones SQL, `AuthGuard`, CSRF
+  enforced, `NotePolicy` y rate limit global.
 - Capa de aplicación: `EventBus` + model events, `Logger`, `Action`/`Service`,
   DTOs, `NoteRepository`, `ServiceProvider` y `ApplicationServices` tipados.
 - ORM de aplicación: migraciones (`MigrationRunner` + `DbSchema`), relaciones
@@ -118,7 +119,8 @@ Rutas del demo:
 | GET | `/users/{id}` | JSON con el param |
 | POST | `/api/echo` | JSON con el body recibido |
 | POST | `/api/register` | formulario/JSON validado (Controller + `validate`) |
-| POST | `/api/login` | login email/password; cookie de sesión |
+| POST | `/api/login` | login email/password; cookie de sesión + `X-CSRF-Token` |
+| GET | `/api/csrf` | token CSRF de la sesión (crea sesión si falta) |
 | GET | `/api/me` | usuario de la sesión o 401 |
 | POST | `/api/logout` | destruye la sesión |
 | GET | `/api/notes` | conteo de notas (Model, sin soft-deleted) |
@@ -147,7 +149,7 @@ target\debug\clx.exe run cls-repositories\tombstone\src\main.clsx -- 8080 test
 Unitarios (desde este directorio):
 
 ```powershell
-..\..\target\debug\clx.exe test
+powershell -File cls-repositories\tombstone\tests\unit\run.ps1
 ```
 
 Integración HTTP real (desde la raíz del repo CLS):
@@ -164,10 +166,20 @@ powershell -File cls-repositories\tombstone\tests\db\run.ps1
 
 Cobertura actual: **11 tests unitarios PASS** (request/response/router/app,
 template, view, types, validation/form/multipart, cookies/CORS/JSON/static,
-status), **64 checks DB PASS** (Model CRUD + migraciones, relaciones, eventos,
-timestamps, soft deletes y factories) y **64 checks de integraci�n PASS**
-(landing, UI kit, API, formulario validado, Model SQLite + soft delete/restore,
-cookies, CORS, static, 404/405).
+status), **73 checks DB PASS** (Model CRUD + migraciones, relaciones, eventos,
+timestamps, soft deletes, factories, sessions/CSRF y policies) y **70 checks de
+integración PASS** (landing, UI kit, API, auth/sesión, CSRF, rate limit,
+Model SQLite + soft delete/restore, cookies, CORS, static, 404/405).
+
+## Configuración de seguridad
+
+- `TOMBSTONE_SECURE_COOKIE=1`: añade `Secure` a la cookie `sid` (producción/HTTPS).
+- `TOMBSTONE_DB=archivo.db`: sesiones persistentes en SQLite (por defecto `:memory:`).
+- `TOMBSTONE_ENV=production`: desactiva `debug`; no cambia el KDF.
+- CSRF: el login devuelve `X-CSRF-Token`; también `GET /api/csrf`. En métodos
+  mutantes con cookie se acepta `X-CSRF-Token` o `_csrf` en el formulario.
+- Rate limit global: 300 req/min por IP (`X-Forwarded-For` o `local`), además
+  de 5 intentos/min para `/api/login`.
 
 ## Uso del framework
 
@@ -442,10 +454,13 @@ El demo separa controller, DTO, Action y Repository:
   `force_delete`, `restore`, `with_trashed`, `only_trashed`, relaciones,
   `where`, `paginate`, agregados, ...); `ModelRow`/`Query`/`Paginator`.
 - `Event`/`EventBus`/`Listener`: eventos síncronos y model events.
-- `hash_password`/`verify_password`: SHA-256 con salt (dev; no CSPRNG).
-- `Session`/`SessionStore`: sesiones en memoria.
-- `AuthGuard`: login/logout/user sobre `users.password_hash`.
-- `Csrf`, `Gate`, `RateLimiter`: primitivas de seguridad.
+- `hash_password`/`verify_password`: SHA-256 + salt con CSPRNG (`modules/csprng`).
+- `Session`/`SessionStore`: store en memoria; `DbSessionStore`: tabla `sessions`.
+- `AuthGuard`: login/logout/user/check/guest sobre `users.password_hash`.
+- `Csrf`/`CsrfMiddleware`: token por sesión, header o campo `_csrf`.
+- `NotePolicy`: owner/admin para `view/update/delete`.
+- `Gate`, `RateLimiter`/`RateLimitMiddleware`: autorización base y rate limit
+  global (429 + `Retry-After`).
 - `Logger`: niveles + buffer de test.
 - `Action`/`Service`: marcadores de capa; providers en el demo.
 - `DbSchema`/`Blueprint`/`Column`: schema builder y migraciones.
@@ -496,9 +511,10 @@ Model, `modules/orm`/`modules/sqlite`; `static` usa `fs` del nodo.
 
 - HTTP/1.1 sin `Transfer-Encoding: chunked` ni keep-alive (una request por
   conexión, `Connection: close`).
-- Auth demo: password hash SHA-256 con salt, pero el salt/token usa `math.random`
-  (LCG). No es CSPRNG; no usar en producción. Sesiones en memoria.
-- `Csrf`/`Gate` existen como primitivas, pero aún no están enforced en todas las rutas.
+- Auth demo: password hash SHA-256 iterado con salt y CSPRNG del sistema; no es
+  Argon2/PBKDF2. Para producción endurecer el KDF.
+- Sesiones persistentes en SQLite; `TOMBSTONE_SECURE_COOKIE=1` activa `Secure`
+  (requiere HTTPS). CSRF se exige con cookie de sesión en métodos mutantes.
 - `headers` es `Record<String, String>`: headers simples usan el último valor;
   los `Set-Cookie` múltiples usan `Response.add_cookie`.
 - Router: faltan constraints (`where`); `{id?}`, named routes y controllers

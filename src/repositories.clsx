@@ -22,6 +22,9 @@ export class NoteRepository {
     function count() -> int { return me.notes.count(); }
     function trashed_count() -> int { return me.notes.only_trashed().count(); }
     function trashed(id: String) -> bool { return me.notes.trashed(id); }
+    function find_trashed(id: String) -> ModelRow {
+        return me.notes.query().with_trashed().where("id", "=", id).first();
+    }
 
     function create(input: NoteInput) -> ModelRow {
         return me.notes.create(input.to_record());

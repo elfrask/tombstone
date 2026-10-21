@@ -1,4 +1,4 @@
-from "tombstone" import Csrf, RateLimiter, Session, SessionStore, hash_password, verify_password;
+from "tombstone" import Csrf, RateLimiter, RateLimitMiddleware, Request, Session, SessionStore, hash_password, verify_password;
 import "check" as check;
 
 function main(args: String[]) -> int {
@@ -15,10 +15,14 @@ function main(args: String[]) -> int {
     check::assertEqStr("security.session.find", store.find(s.id).id, s.id);
     check::assertEq("security.session.destroy", store.destroy(s.id), 1);
     check::assertEq("security.session.count", store.count(), 0);
+    var exp = store.create();
+    exp.expires_at = now() - 1;
+    check::assertTrue("security.session.expired", !store.find(exp.id).valid());
 
     var session = Session("x");
     var csrf = Csrf();
     var token = csrf.token(session);
+    check::assertEq("security.csrf.length", token.length, 32);
     check::assertTrue("security.csrf.verify", csrf.verify(session, token));
     check::assertTrue("security.csrf.reject", !csrf.verify(session, "bad"));
 
@@ -26,6 +30,14 @@ function main(args: String[]) -> int {
     check::assertTrue("security.rate.1", limiter.allow("ip", 2, 60000));
     check::assertTrue("security.rate.2", limiter.allow("ip", 2, 60000));
     check::assertTrue("security.rate.3", !limiter.allow("ip", 2, 60000));
+
+    var raw = "GET / HTTP/1.1\r\nHost: x\r\n\r\n";
+    var mw = RateLimitMiddleware(RateLimiter(), 2, 60000);
+    check::assertEq("security.http.rate.1", mw.check(Request.parse(raw)).status, 0);
+    check::assertEq("security.http.rate.2", mw.check(Request.parse(raw)).status, 0);
+    var denied = mw.check(Request.parse(raw));
+    check::assertEq("security.http.rate.3", denied.status, 429);
+    check::assertEqStr("security.http.rate.retry", denied.headers["retry-after"], "60");
 
     if (check::fails() > 0) { return 1; };
     return 0;

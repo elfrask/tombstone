@@ -2,8 +2,8 @@
 #
 # Origen: adaptado de examples/pkgcheck/src/sha256.clsx.
 # password hash = sha256$iter$salt$digest (iteraciones de SHA-256; no Argon2).
-# El salt/token usa math.random (LCG) en este demo: NO es CSPRNG de producción.
-import "math" as math;
+# Salt/tokens: CSPRNG del sistema (`modules/csprng`).
+import "csprng" as csprng;
 
 # sha256.clsx - SHA-256 (FIPS 180-4) en CLS puro (0 FFI). Prueba #8 (pkgcheck).
 #
@@ -146,19 +146,7 @@ function sha256Hex(msg: String) -> String {
     return toHex(sha256Bytes(msg.toBytes()));
 }
 
-# --- password hashing (demo; no Argon2/CSPRNG) ---------------------------
-
-function random_hex(n: int) -> String {
-    var alphabet = "0123456789abcdef";
-    var out = "";
-    var i = 0;
-    while (i < n) {
-        var v = int(math.random() * 16.0);
-        out = out + alphabet[v];
-        i = i + 1;
-    };
-    return out;
-}
+# --- password hashing (demo; no Argon2) -----------------------------------
 
 function derive(password: String, salt: String, rounds: int) -> String {
     var h = sha256Hex(salt + ":" + password);
@@ -170,7 +158,7 @@ function derive(password: String, salt: String, rounds: int) -> String {
     return h;
 }
 export function hash_password(password: String) -> String {
-    var salt = random_hex(16);
+    var salt = csprng::random_hex(16);
     return "sha256$1000$" + salt + "$" + derive(password, salt, 1000);
 }
 
@@ -191,5 +179,5 @@ export function verify_password(password: String, encoded: String) -> bool {
 }
 
 export function token_hex(bytes: int) -> String {
-    return random_hex(bytes * 2);
+    return csprng::random_hex(bytes);
 }

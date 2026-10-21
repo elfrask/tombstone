@@ -1,0 +1,30 @@
+from "tombstone" import Database, DbSchema, NotePolicy;
+import "sqlite" as sqlite;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+    var db = Database(sqlite::SqliteDriver());
+    db.connect(":memory:");
+    var schema = db.schema();
+    var users = schema.blueprint("users");
+    users.id();
+    users.string("email");
+    users.string("role");
+    schema.create(users);
+    var notes = schema.blueprint("notes");
+    notes.id();
+    notes.foreign_id("user_id", "users", "CASCADE");
+    notes.string("title");
+    schema.create(notes);
+
+    var u1 = db.table("users").create({email: "ana@example.com", role: "user"});
+    var u2 = db.table("users").create({email: "beto@example.com", role: "user"});
+    var n = db.table("notes").create({user_id: u1.get("id"), title: "Ana"});
+    var policy = NotePolicy();
+    check::assertTrue("policy.owner.allow", policy.allows(u1, "view", n));
+    check::assertTrue("policy.other.deny", !policy.allows(u2, "view", n));
+    db.close();
+    if (check::fails() > 0) { return 1; };
+    return 0;
+};

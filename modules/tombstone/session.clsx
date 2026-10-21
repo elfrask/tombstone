@@ -1,13 +1,91 @@
-# tombstone/session.clsx - Sesiones en memoria (demo; no persistente).
+# tombstone/session.clsx - Sesiones con expiración.
+#
+# `SessionStore` es el store en memoria (tests/desarrollo). `DbSessionStore`
+# persiste en la tabla `sessions` y es el store que usa `AuthGuard` en el demo.
+# Los valores se guardan como pares key=value escapados (sin depender de
+# `JSON.keys()`, que el JIT no soporta).
 from "./hash" import token_hex;
+from "./model" import Model, ModelRow;
+
+const DEFAULT_TTL_MS: int = 86400000; # 24 h
+
+function hex_digit(n: int) -> String {
+    var d = n & 15;
+    if (d < 10) { return char(48 + d).toString(); };
+    return char(55 + d).toString();
+}
+
+function escape_part(s: String) -> String {
+    var out = "";
+    var cs = s.toChar();
+    for each c in (cs) {
+        var n = ord(c);
+        var keep = (n >= 48 && n <= 57) || (n >= 65 && n <= 90) ||
+                   (n >= 97 && n <= 122) || n == 45 || n == 46 || n == 95;
+        if (keep) {
+            out = out + c.toString();
+        } else {
+            out = out + "%" + hex_digit(n / 16) + hex_digit(n & 15);
+        };
+    };
+    return out;
+}
+
+function hex_value(n: int) -> int {
+    if (n >= 48 && n <= 57) { return n - 48; };
+    if (n >= 65 && n <= 70) { return n - 55; };
+    if (n >= 97 && n <= 102) { return n - 87; };
+    return 0;
+}
+
+function unescape_part(s: String) -> String {
+    var out = "";
+    var cs = s.toChar();
+    var i = 0;
+    while (i < cs.length) {
+        if (ord(cs[i]) == 37 && i + 2 < cs.length) {
+            var hi = hex_value(ord(cs[i + 1]));
+            var lo = hex_value(ord(cs[i + 2]));
+            out = out + char(hi * 16 + lo).toString();
+            i = i + 3;
+        } else {
+            out = out + cs[i].toString();
+            i = i + 1;
+        };
+    };
+    return out;
+}
+
+function encode_data(data: Record<String, String>) -> String {
+    var out = "";
+    for each k in (data.keys()) {
+        if (out != "") { out = out + "&"; };
+        out = out + escape_part(k) + "=" + escape_part(data[k]);
+    };
+    return out;
+}
+
+function decode_data(raw: String) -> Record<String, String> {
+    var data: Record<String, String> = {};
+    if (raw == "") { return data; };
+    for each pair in (raw.split("&")) {
+        var kv = pair.split("=");
+        if (kv.length == 2) {
+            data[unescape_part(kv[0])] = unescape_part(kv[1]);
+        };
+    };
+    return data;
+}
 
 export class Session {
     public var id: String;
     public var data: Record<String, String>;
+    public var expires_at: int;
 
     function main(id: String) {
         me.id = id;
         me.data = {};
+        me.expires_at = now() + DEFAULT_TTL_MS;
     }
 
     function get(key: String) -> String {
@@ -17,22 +95,35 @@ export class Session {
     function set(key: String, value: String) { me.data[key] = value; }
     function remove(key: String) { me.data[key] = ""; }
     function valid() -> bool { return me.id != ""; }
+    function expired() -> bool { return me.expires_at <= now(); }
 };
 
 export class SessionStore {
     public var sessions: Session[];
+    public var ttl_ms: int;
 
-    function main() { me.sessions = []; }
+    function main() {
+        me.sessions = [];
+        me.ttl_ms = DEFAULT_TTL_MS;
+    }
 
     function create() -> Session {
         var s = Session(token_hex(24));
+        s.expires_at = now() + me.ttl_ms;
         me.sessions.push(s);
         return s;
     }
 
     function find(id: String) -> Session {
+        if (id == "") { return Session(""); };
         for each s in (me.sessions) {
-            if (s.id == id) { return s; };
+            if (s.id == id) {
+                if (s.expired()) {
+                    me.destroy(id);
+                    return Session("");
+                };
+                return s;
+            };
         };
         return Session("");
     }
@@ -48,4 +139,65 @@ export class SessionStore {
     }
 
     function count() -> int { return me.sessions.length; }
+    function persist(s: Session) {}
+};
+
+# Store SQL sobre `sessions` (primary key lógica: token).
+export class DbSessionStore {
+    public var table: Model;
+    public var ttl_ms: int;
+
+    function main(table: Model) {
+        me.table = table;
+        me.ttl_ms = DEFAULT_TTL_MS;
+    }
+
+    function create() -> Session {
+        var s = Session(token_hex(24));
+        s.expires_at = now() + me.ttl_ms;
+        me.table.create({
+            token: s.id,
+            data: "",
+            expires_at: s.expires_at.toString()
+        });
+        return s;
+    }
+
+    function find(id: String) -> Session {
+        if (id == "") { return Session(""); };
+        var row = me.table.find(id);
+        if (!row.exists) { return Session(""); };
+        if (row.get_int("expires_at") <= now()) {
+            me.destroy(id);
+            return Session("");
+        };
+        var s = Session(id);
+        s.expires_at = row.get_int("expires_at");
+        s.data = decode_data(row.get("data"));
+        return s;
+    }
+
+    function destroy(id: String) -> int {
+        var row = me.table.find(id);
+        if (!row.exists) { return 0; };
+        return me.table.delete(id);
+    }
+
+    function count() -> int { return me.table.count(); }
+
+    function persist(s: Session) {
+        if (!s.valid()) { return; };
+        var row = me.table.find(s.id);
+        if (!row.exists) {
+            me.table.create({
+                token: s.id,
+                data: encode_data(s.data),
+                expires_at: s.expires_at.toString()
+            });
+            return;
+        };
+        row.set("data", encode_data(s.data));
+        row.set("expires_at", s.expires_at.toString());
+        row.save();
+    }
 };
