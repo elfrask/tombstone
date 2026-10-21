@@ -135,6 +135,21 @@ try {
         Check "POST /api/register json" ($r -match "HTTP/1\.1 201 Created") $r
         Check "POST /api/register json name" ($r -match '"name":"Beto"') $r
 
+        $r = CurlRaw "POST" "/api/login" "email=ana%40example.com&password=secret123" @("Content-Type: application/x-www-form-urlencoded")
+        Check "POST /api/login status" ($r -match "HTTP/1\.1 200 OK") $r
+        $sid = [regex]::Match($r, 'set-cookie: sid=([^;]+)').Groups[1].Value
+        Check "POST /api/login cookie" ($sid -ne "") $r
+        $r = CurlRaw "GET" "/api/me" $null @("Cookie: sid=$sid")
+        Check "GET /api/me status" ($r -match "HTTP/1\.1 200 OK") $r
+        Check "GET /api/me email" ($r -match '"email":"ana@example.com"') $r
+        $r = CurlRaw "POST" "/api/login" "email=ana%40example.com&password=bad" @("Content-Type: application/x-www-form-urlencoded")
+        Check "POST /api/login invalid" ($r -match "HTTP/1\.1 401 Unauthorized") $r
+        for ($i = 0; $i -lt 3; $i++) {
+            $null = CurlRaw "POST" "/api/login" "email=ana%40example.com&password=bad" @("Content-Type: application/x-www-form-urlencoded")
+        }
+        $r = CurlRaw "POST" "/api/login" "email=ana%40example.com&password=bad" @("Content-Type: application/x-www-form-urlencoded")
+        Check "POST /api/login rate limit" ($r -match "HTTP/1\.1 429 Too Many Requests") $r
+
         $r = CurlRaw "POST" "/api/register" "name=A&email=no&password=1" @("Content-Type: application/x-www-form-urlencoded")
         Check "POST /api/register invalid" ($r -match "HTTP/1\.1 422 Unprocessable Entity") $r
         Check "POST /api/register errors" ($r -match '"errors"') $r

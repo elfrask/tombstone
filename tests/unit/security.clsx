@@ -1,0 +1,32 @@
+from "tombstone" import Csrf, RateLimiter, Session, SessionStore, hash_password, verify_password;
+import "check" as check;
+
+function main(args: String[]) -> int {
+    check::reset();
+
+    var h = hash_password("secret123");
+    check::assertTrue("security.hash.format", h.startsWith("sha256$1000$"));
+    check::assertTrue("security.hash.verify", verify_password("secret123", h));
+    check::assertTrue("security.hash.reject", !verify_password("bad", h));
+
+    var store = SessionStore();
+    var s = store.create();
+    check::assertTrue("security.session.valid", s.valid());
+    check::assertEqStr("security.session.find", store.find(s.id).id, s.id);
+    check::assertEq("security.session.destroy", store.destroy(s.id), 1);
+    check::assertEq("security.session.count", store.count(), 0);
+
+    var session = Session("x");
+    var csrf = Csrf();
+    var token = csrf.token(session);
+    check::assertTrue("security.csrf.verify", csrf.verify(session, token));
+    check::assertTrue("security.csrf.reject", !csrf.verify(session, "bad"));
+
+    var limiter = RateLimiter();
+    check::assertTrue("security.rate.1", limiter.allow("ip", 2, 60000));
+    check::assertTrue("security.rate.2", limiter.allow("ip", 2, 60000));
+    check::assertTrue("security.rate.3", !limiter.allow("ip", 2, 60000));
+
+    if (check::fails() > 0) { return 1; };
+    return 0;
+};

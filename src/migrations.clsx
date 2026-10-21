@@ -11,6 +11,7 @@ export class CreateInitialSchema: Migration {
         users.id();
         users.string("name");
         users.string("email").unique();
+        users.string("password_hash").nullable();
         users.timestamps();
         schema.create(users);
 

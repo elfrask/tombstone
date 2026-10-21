@@ -1,22 +1,24 @@
 # src/controllers.clsx - Controladores del proyecto demo.
 #
 # El controller valida y mapea a DTOs; delega en Actions/Repository/Resource.
-from "tombstone" import Controller, PaginatedResource, Request, Response;
+from "tombstone" import AuthGuard, Controller, CookieOptions, PaginatedResource, RateLimiter, Request, Response, serialize_cookie, parse_cookies;
 from "./actions" import CreateNoteAction, DeleteNoteAction, RestoreNoteAction;
 from "./dtos" import NoteInput, RegisterUserInput;
-from "./repositories" import NoteRepository;
+from "./repositories" import NoteRepository, UserRepository;
 from "./resources" import NoteResource;
 
 export class RegistrationController: Controller {
-    function main(req: Request) {
+    public var users: UserRepository;
+
+    function main(req: Request, users: UserRepository) {
         super.main(req);
+        me.users = users;
     }
 
     function handle() -> Response {
         if (me.action_name == "store") { return me.store(); };
         return me.error("accion no soportada", 500);
     }
-
 
     function store() -> Response {
         var v = me.validate({
@@ -27,11 +29,66 @@ export class RegistrationController: Controller {
         if (v.failed()) {
             return me.invalid(v);
         };
-        var input = RegisterUserInput(
-            v.data["name"], v.data["email"], v.data["password"]
-        );
-        var out = input.public_record();
-        return me.created({ok: true, name: out["name"], email: out["email"]});
+        var input = RegisterUserInput(v.data["name"], v.data["email"], v.data["password"]);
+        var row = me.users.create(input.name, input.email, input.password);
+        return me.created({ok: true, id: row.get("id"), name: input.name, email: input.email});
+    }
+};
+
+export class AuthController: Controller {
+    public var auth: AuthGuard;
+    public var limiter: RateLimiter;
+
+    function main(req: Request, auth: AuthGuard, limiter: RateLimiter) {
+        super.main(req);
+        me.auth = auth;
+        me.limiter = limiter;
+    }
+
+    function handle() -> Response {
+        if (me.action_name == "login") { return me.login(); };
+        if (me.action_name == "me") { return me.current(); };
+        if (me.action_name == "logout") { return me.logout(); };
+        return me.error("accion no soportada", 500);
+    }
+
+    function session_id() -> String {
+        var jar = parse_cookies(me.req.header("cookie"));
+        if (jar.has("sid")) { return jar["sid"]; };
+        return "";
+    }
+
+    function login() -> Response {
+        var key = me.req.header("x-forwarded-for");
+        if (key == "") { key = "local"; };
+        if (!me.limiter.allow("login:" + key, 5, 60000)) {
+            return me.error("Too many requests", 429);
+        };
+        var v = me.validate({email: "required|email", password: "required"});
+        if (v.failed()) { return me.invalid(v); };
+        var s = me.auth.login(v.data["email"], v.data["password"]);
+        if (!s.valid()) { return me.error("Credenciales invalidas", 401); };
+        var user = me.auth.user(s.id);
+        var opts = CookieOptions();
+        opts.path = "/";
+        opts.http_only = true;
+        opts.same_site = "Lax";
+        var res = me.ok({id: user.get("id"), name: user.get_str("name"), email: user.get_str("email")});
+        res.add_cookie(serialize_cookie("sid", s.id, opts));
+        return res;
+    }
+
+    function current() -> Response {
+        var user = me.auth.user(me.session_id());
+        if (!user.exists) { return me.error("No autenticado", 401); };
+        return me.ok({id: user.get("id"), name: user.get_str("name"), email: user.get_str("email")});
+    }
+
+    function logout() -> Response {
+        me.auth.logout(me.session_id());
+        var res = me.ok({ok: true});
+        res.add_cookie("sid=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+        return res;
     }
 };
 

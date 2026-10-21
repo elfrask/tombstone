@@ -1,0 +1,70 @@
+# tombstone/security.clsx - CSRF, policies/gates y rate limiting.
+from "./hash" import token_hex;
+from "./model" import ModelRow;
+from "./session" import Session;
+
+export class Csrf {
+    function token(session: Session) -> String {
+        var t = session.get("csrf");
+        if (t == "") {
+            t = token_hex(16);
+            session.set("csrf", t);
+        };
+        return t;
+    }
+
+    function verify(session: Session, token: String) -> bool {
+        return token != "" && token == session.get("csrf");
+    }
+};
+
+export class Gate {
+    function allows(user: ModelRow, action: String) -> bool {
+        if (!user.exists) { return false; };
+        var role = user.get("role");
+        if (role == "admin") { return true; };
+        if (action == "view") { return true; };
+        return false;
+    }
+};
+
+export class RateEntry {
+    public var key: String;
+    public var count: int;
+    public var reset_at: int;
+    function main(key: String, reset_at: int) {
+        me.key = key; me.count = 0; me.reset_at = reset_at;
+    }
+};
+
+export class RateLimiter {
+    public var entries: RateEntry[];
+
+    function main() { me.entries = []; }
+
+    function allow(key: String, limit: int, window_ms: int) -> bool {
+        var now_ms = now();
+        var found = false;
+        for each e in (me.entries) {
+            if (e.key == key) {
+                found = true;
+                if (now_ms >= e.reset_at) {
+                    e.count = 0;
+                    e.reset_at = now_ms + window_ms;
+                };
+                if (e.count >= limit) { return false; };
+                e.count = e.count + 1;
+                return true;
+            };
+        };
+        if (!found) {
+            var e = RateEntry(key, now_ms + window_ms);
+            e.count = 1;
+            me.entries.push(e);
+            return true;
+        };
+        return true;
+    }
+
+    function clear() { me.entries = []; }
+};

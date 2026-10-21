@@ -37,6 +37,10 @@ fuera (`../../src`, `../../public`); este directorio es el framework.
 | `event.clsx` | `Event`, `EventBus`, `Listener` |
 | `log.clsx` | `Logger` (niveles + buffer) |
 | `action.clsx` | `Action`, `Service` (marcadores de capa) |
+| `hash.clsx` | SHA-256 + password hash (dev) |
+| `session.clsx` | `Session`, `SessionStore` |
+| `auth.clsx` | `AuthGuard` |
+| `security.clsx` | `Csrf`, `Gate`, `RateLimiter` |
 | `resource.clsx` | `Resource` (ModelRow -> JSON) |
 | `pagination.clsx` | `PaginatedResource` (data + meta) |
 | `types/*.clsx` | interfaces de props CMX (una por etiqueta HTML + UI) |
@@ -155,6 +159,16 @@ pueden cancelar con `e.cancel()` (lanza error). Compartir un bus:
 `handle`. El demo usa `ApplicationServices` (campos tipados), `ServiceProvider`
 (`register`/`boot`), `NoteRepository`, `NoteInput`/`RegisterUserInput` y
 Actions para el flujo `Controller -> DTO -> Action -> Repository -> Model`.
+
+## Seguridad (dev)
+
+- `hash_password`/`verify_password` usan SHA-256 + salt e iteraciones; **no**
+  Argon2 y el salt/token usa `math.random` (LCG), no CSPRNG.
+- `Session`/`SessionStore` guardan sesiones en memoria.
+- `AuthGuard.login(email, password)` valida `users.password_hash` y crea sesión;
+  `user(session_id)` y `logout`.
+- `Csrf` emite/valida token por `Session`; `Gate` es una policy base; `RateLimiter`
+  limita por clave/ventana (el demo lo usa en `/api/login`).
 
 ## Uso
 

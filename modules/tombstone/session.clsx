@@ -1,0 +1,51 @@
+# tombstone/session.clsx - Sesiones en memoria (demo; no persistente).
+from "./hash" import token_hex;
+
+export class Session {
+    public var id: String;
+    public var data: Record<String, String>;
+
+    function main(id: String) {
+        me.id = id;
+        me.data = {};
+    }
+
+    function get(key: String) -> String {
+        if (me.data.has(key)) { return me.data[key]; };
+        return "";
+    }
+    function set(key: String, value: String) { me.data[key] = value; }
+    function remove(key: String) { me.data[key] = ""; }
+    function valid() -> bool { return me.id != ""; }
+};
+
+export class SessionStore {
+    public var sessions: Session[];
+
+    function main() { me.sessions = []; }
+
+    function create() -> Session {
+        var s = Session(token_hex(24));
+        me.sessions.push(s);
+        return s;
+    }
+
+    function find(id: String) -> Session {
+        for each s in (me.sessions) {
+            if (s.id == id) { return s; };
+        };
+        return Session("");
+    }
+
+    function destroy(id: String) -> int {
+        var kept: Session[] = [];
+        var n = 0;
+        for each s in (me.sessions) {
+            if (s.id == id) { n = n + 1; } else { kept.push(s); };
+        };
+        me.sessions = kept;
+        return n;
+    }
+
+    function count() -> int { return me.sessions.length; }
+};

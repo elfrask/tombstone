@@ -1,6 +1,15 @@
 # src/repositories.clsx - Repositorio de notas sobre Model (capa de dominio).
-from "tombstone" import Model, ModelRow, Paginator;
+from "tombstone" import Model, ModelRow, Paginator, hash_password;
 from "./dtos" import NoteInput;
+
+export class UserRepository {
+    public var users: Model;
+    function main(users: Model) { me.users = users; }
+    function find_by_email(email: String) -> ModelRow { return me.users.first_where("email", email); }
+    function create(name: String, email: String, password: String) -> ModelRow {
+        return me.users.create({name: name, email: email, password_hash: hash_password(password)});
+    }
+};
 
 export class NoteRepository {
     public var notes: Model;

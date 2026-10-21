@@ -22,6 +22,7 @@ Fase 0 completa y ampliada:
 - Formularios: urlencoded, multipart (campos + `FormFile`) y JSON en `Request`.
 - Validación de request: reglas pipe + builder `field()/schema()`; `Controller`.
 - Model: `Model/Query/ModelRow` sobre `modules/orm`; SQLite en el demo.
+- Seguridad: password hashing, sesiones, `AuthGuard`, CSRF, Gate y rate limiter.
 - Capa de aplicación: `EventBus` + model events, `Logger`, `Action`/`Service`,
   DTOs, `NoteRepository`, `ServiceProvider` y `ApplicationServices` tipados.
 - ORM de aplicación: migraciones (`MigrationRunner` + `DbSchema`), relaciones
@@ -117,6 +118,9 @@ Rutas del demo:
 | GET | `/users/{id}` | JSON con el param |
 | POST | `/api/echo` | JSON con el body recibido |
 | POST | `/api/register` | formulario/JSON validado (Controller + `validate`) |
+| POST | `/api/login` | login email/password; cookie de sesión |
+| GET | `/api/me` | usuario de la sesión o 401 |
+| POST | `/api/logout` | destruye la sesión |
 | GET | `/api/notes` | conteo de notas (Model, sin soft-deleted) |
 | POST | `/api/notes` | crea nota desde formulario (Model) |
 | GET | `/api/notes/trashed` | conteo de notas en la papelera |
@@ -158,10 +162,10 @@ Model/SQLite (desde la raíz; usa `:memory:`):
 powershell -File cls-repositories\tombstone\tests\db\run.ps1
 ```
 
-Cobertura actual: **10 tests unitarios PASS** (request/response/router/app,
+Cobertura actual: **11 tests unitarios PASS** (request/response/router/app,
 template, view, types, validation/form/multipart, cookies/CORS/JSON/static,
 status), **64 checks DB PASS** (Model CRUD + migraciones, relaciones, eventos,
-timestamps, soft deletes y factories) y **58 checks de integraci�n PASS**
+timestamps, soft deletes y factories) y **64 checks de integraci�n PASS**
 (landing, UI kit, API, formulario validado, Model SQLite + soft delete/restore,
 cookies, CORS, static, 404/405).
 
@@ -438,6 +442,10 @@ El demo separa controller, DTO, Action y Repository:
   `force_delete`, `restore`, `with_trashed`, `only_trashed`, relaciones,
   `where`, `paginate`, agregados, ...); `ModelRow`/`Query`/`Paginator`.
 - `Event`/`EventBus`/`Listener`: eventos síncronos y model events.
+- `hash_password`/`verify_password`: SHA-256 con salt (dev; no CSPRNG).
+- `Session`/`SessionStore`: sesiones en memoria.
+- `AuthGuard`: login/logout/user sobre `users.password_hash`.
+- `Csrf`, `Gate`, `RateLimiter`: primitivas de seguridad.
 - `Logger`: niveles + buffer de test.
 - `Action`/`Service`: marcadores de capa; providers en el demo.
 - `DbSchema`/`Blueprint`/`Column`: schema builder y migraciones.
@@ -488,6 +496,9 @@ Model, `modules/orm`/`modules/sqlite`; `static` usa `fs` del nodo.
 
 - HTTP/1.1 sin `Transfer-Encoding: chunked` ni keep-alive (una request por
   conexión, `Connection: close`).
+- Auth demo: password hash SHA-256 con salt, pero el salt/token usa `math.random`
+  (LCG). No es CSPRNG; no usar en producción. Sesiones en memoria.
+- `Csrf`/`Gate` existen como primitivas, pero aún no están enforced en todas las rutas.
 - `headers` es `Record<String, String>`: headers simples usan el último valor;
   los `Set-Cookie` múltiples usan `Response.add_cookie`.
 - Router: faltan constraints (`where`); `{id?}`, named routes y controllers

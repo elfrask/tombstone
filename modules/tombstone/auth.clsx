@@ -1,0 +1,33 @@
+# tombstone/auth.clsx - Guard de sesión sobre users/password_hash.
+from "./model" import Model, ModelRow;
+from "./session" import Session, SessionStore;
+from "./hash" import verify_password;
+
+export class AuthGuard {
+    public var users: Model;
+    public var sessions: SessionStore;
+
+    function main(users: Model, sessions: SessionStore) {
+        me.users = users;
+        me.sessions = sessions;
+    }
+
+    function login(email: String, password: String) -> Session {
+        var row = me.users.first_where("email", email);
+        if (!row.exists) { return Session(""); };
+        if (!verify_password(password, row.get("password_hash"))) { return Session(""); };
+        var s = me.sessions.create();
+        s.set("user_id", row.get("id"));
+        return s;
+    }
+
+    function user(session_id: String) -> ModelRow {
+        var s = me.sessions.find(session_id);
+        if (!s.valid()) { return me.users.find(""); };
+        return me.users.find(s.get("user_id"));
+    }
+
+    function logout(session_id: String) -> int {
+        return me.sessions.destroy(session_id);
+    }
+};
