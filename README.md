@@ -92,13 +92,24 @@ Los ladrillos reutilizables viven en la stdlib global: `modules/socket`,
 - `gcc` (MinGW-w64 x64) para los shims de sockets/SQLite.
 - `wasm32-unknown-unknown` (lo usa `cls-internals`).
 
-Los shims de `socket` y `sqlite` resuelven su ruta **relativa al CWD**: el
-servidor se ejecuta desde la raíz del repo CLS.
+Los shims nativos se resuelven contra el `cls.json` del módulo, no contra el
+CWD. Ya se puede ejecutar el servidor desde cualquier directorio.
 
 ```powershell
 powershell -File modules\socket\build.ps1
 powershell -File modules\sqlite\build.ps1
 ```
+
+## Build
+
+```powershell
+target\debug\clx.exe build
+```
+
+Genera `dist/app.clsapp` y `dist/native-libs/<paquete>@<version>/`. Cada paquete
+conserva los nombres originales de sus `.dll`/`.so`/`.dylib` y no comparte
+carpeta con otros módulos, evitando colisiones entre versiones. El manifiesto
+del `.clsapp` incluye el mapa `nativeLibs`.
 
 ## Demo
 
@@ -527,8 +538,8 @@ Model, `modules/orm`/`modules/sqlite`; `static` usa `fs` del nodo.
 - JSON: usa el módulo interno `json` del nodo (deuda host-side). El parser es
   permisivo; no se expone un validador estricto. `json.stringify(array)` no es
   fiable: se usa `json_string_array`.
-- `static` / sockets / I/O: rutas de shims relativas al CWD; ejecutar desde la
-  raíz del repo CLS.
+- `static` / sockets / I/O: los shims se resuelven contra el `cls.json` del
+  módulo; el CWD ya no determina la ruta del `.dll`.
 - Sin concurrencia: el loop es bloqueante (no hay `async` ejecutable todavía).
 
 ## Bugs del lenguaje encontrados (dogfooding)
