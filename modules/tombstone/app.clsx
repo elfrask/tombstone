@@ -12,6 +12,10 @@ from "./controller" import Controller;
 from "./static" import StaticHandler;
 from "./cors" import CorsOptions, cors_apply;
 
+function default_not_found(req: Request) -> Response {
+    return Response.not_found();
+}
+
 export class App {
     public var router: Router;
     public var cors_options: CorsOptions;
@@ -19,6 +23,7 @@ export class App {
     public var statics: StaticHandler[];
     public var use_cors: bool;
     public var verbose: bool;
+    public var not_found_fn: (Request) -> Response;
 
     function main() {
         me.router = Router();
@@ -27,6 +32,7 @@ export class App {
         me.statics = [];
         me.use_cors = false;
         me.verbose = true;
+        me.not_found_fn = default_not_found;
     }
 
     # --- registro de rutas ------------------------------------------------
@@ -86,6 +92,11 @@ export class App {
         return RouteGroup(me.router, prefix, []);
     }
 
+    function not_found(fn: (Request) -> Response) -> App {
+        me.not_found_fn = fn;
+        return me;
+    }
+
     function serve_static(prefix: String, directory: String) -> App {
         me.statics.push(StaticHandler(prefix, directory));
         return me;
@@ -129,7 +140,12 @@ export class App {
                 };
             };
 
-            return me.finish(me.router.dispatch(req));
+            var res = me.router.dispatch(req);
+            if (res.status == 404) {
+                var fn = me.not_found_fn;
+                return me.finish(fn(req));
+            };
+            return me.finish(res);
         } catch (err) {
             print("[tombstone] error: " + str(err));
             var res = Response(500, "500 Internal Server Error");

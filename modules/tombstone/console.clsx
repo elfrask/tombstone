@@ -56,23 +56,72 @@ function create_app(args: String[]) -> int {
         "  \"dependencies\": {\"tombstone\": \"^0.2.0\"}\n" +
         "}\n");
     fs.writeFile("app/main.clsx",
-        "from \"tombstone\" import App, Request, Response, serve;\n\n" +
+        "from \"tombstone\" import App, TestClient, serve;\n" +
+        "from \"./routes/index\" import register_routes;\n\n" +
         "function main(args: String[]) -> int {\n" +
+        "    var app = App();\n" +
+        "    register_routes(app);\n" +
+        "    if (args.length > 0 && args[0] == \"test\") {\n" +
+        "        var client = TestClient(app);\n" +
+        "        client.get(\"/\").assert_status(200);\n" +
+        "        client.get(\"/no-existe\").assert_status(404).assert_contains(\"Pagina no encontrada\");\n" +
+        "        print(\"OK: app\");\n" +
+        "        return 0;\n" +
+        "    };\n" +
         "    var port = 3000;\n" +
         "    if (args.length > 0) { port = int(args[0]); };\n" +
-        "    var app = App();\n" +
-        "    app.get(\"/\", (req: Request) -> Response {\n" +
-        "        return Response.text(\"Hello Tombstone\");\n" +
-        "    });\n" +
         "    return serve(app, port);\n" +
         "};\n");
     fs.writeFile("app/routes/index.clsx",
-        "from \"tombstone\" import App, Request, Response;\n" +
+        "from \"tombstone\" import App, Request, Response, render;\n" +
+        "from \"./controllers/HomeController\" import HomeController;\n" +
+        "from \"./views/Layout\" import Page;\n" +
+        "from \"./views/NotFoundView\" import NotFoundView;\n\n" +
         "export function register_routes(app: App) -> App {\n" +
+        "    app.get(\"/\", (req: Request) -> Response {\n" +
+        "        return HomeController(req).index();\n" +
+        "    });\n" +
         "    app.get(\"/health\", (req: Request) -> Response {\n" +
         "        return Response.json_response(\"{\\\"ok\\\":true}\");\n" +
         "    });\n" +
+        "    app.not_found((req: Request) -> Response {\n" +
+        "        var res = Response(404, render(Page(\"404\", NotFoundView())));\n" +
+        "        res.headers[\"content-type\"] = \"text/html; charset=utf-8\";\n" +
+        "        return res;\n" +
+        "    });\n" +
         "    return app;\n" +
+        "};\n");
+    fs.writeFile("app/controllers/HomeController.clsx",
+        "from \"tombstone\" import Controller, Response, render;\n" +
+        "from \"./views/Layout\" import Page;\n" +
+        "from \"./views/HomeView\" import HomeView;\n\n" +
+        "export class HomeController: Controller {\n" +
+        "    function index() -> Response {\n" +
+        "        return Response.html(render(Page(\"Inicio\", HomeView())));\n" +
+        "    }\n" +
+        "};\n");
+    fs.writeFile("app/views/HomeView.clsx",
+        "from \"./components/Welcome\" import Welcome;\n\n" +
+        "export function HomeView() -> Cmx {\n" +
+        "    return (<main class=\"container\"><Welcome title=\"Tombstone\" /><p>Tu aplicacion base esta lista.</p></main>);\n" +
+        "};\n");
+    fs.writeFile("app/views/Layout.clsx",
+        "from \"tombstone\" import Template;\n\n" +
+        "export function Page(title: String, body: Cmx) -> Cmx {\n" +
+        "    var t = Template();\n" +
+        "    t.set_lang(\"es\");\n" +
+        "    t.set_title(title);\n" +
+        "    t.add_style(\"/public/style.css\");\n" +
+        "    return t.render(body);\n" +
+        "};\n");
+    fs.writeFile("app/views/NotFoundView.clsx",
+        "export function NotFoundView() -> Cmx {\n" +
+        "    return (<main class=\"container not-found\"><p class=\"kicker\">404</p><h1>Pagina no encontrada</h1><a href=\"/\">Volver al inicio</a></main>);\n" +
+        "};\n");
+    fs.writeFile("app/components/Welcome.clsx",
+        "from \"tombstone\" import raw, renderChildren;\n\n" +
+        "export function Welcome(props: Record<String, Value>, children: Cmx[]) -> Cmx {\n" +
+        "    return (<section class=\"welcome\"><h1>{str(props.title)}</h1>{raw(renderChildren(children))}</section>);\n" +
         "};\n");
     fs.writeFile("config/environment.clsx",
         "import \"env\" as env;\n" +

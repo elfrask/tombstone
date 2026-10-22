@@ -209,3 +209,5 @@ Requiere el repo CLS en `pathModules` (ver README del proyecto) para resolver
 - `tombstone.sh` es un alias POSIX del launcher sin extensión.
 - `clx start` añade al `PATH` los `bin/` de los módulos resueltos
   (`modules/*/bin`, `pathModules`, `~/.cls/modules`, `~/.cls/bin`).
+- `App.not_found(fn)` permite renderizar una pagina 404 propia; si no se
+  configura, responde `404 Not Found` en texto plano.
