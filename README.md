@@ -119,6 +119,15 @@ Desde la raíz del repo CLS:
 target\debug\clx.exe run cls-repositories\tombstone\src\main.clsx -- 8080
 ```
 
+O desde la raíz del proyecto, con el launcher:
+
+```powershell
+tombstone serve 8080
+tombstone test
+tombstone check
+tombstone build
+```
+
 Rutas del demo:
 
 | Método | Ruta | Respuesta |
@@ -157,7 +166,17 @@ target\debug\clx.exe run cls-repositories\tombstone\src\main.clsx -- 8080 test
 
 ## Tests
 
-Unitarios (desde este directorio):
+Con el launcher, desde la raíz del proyecto:
+
+```powershell
+tombstone test:all      # unit + autotest + DB + HTTP
+tombstone test          # autotest in-process
+tombstone test:unit
+tombstone test:db
+tombstone test:http
+```
+
+También se pueden ejecutar los runners directamente. Unitarios:
 
 ```powershell
 powershell -File cls-repositories\tombstone\tests\unit\run.ps1
@@ -198,6 +217,12 @@ bash cls-repositories/tombstone/modules/tombstone/scripts/install-global.sh
 Agregá `~/.cls/bin` al `PATH`. Desde la raíz de una app Tombstone:
 
 ```powershell
+tombstone help
+tombstone serve 3000
+tombstone test
+tombstone test:unit
+tombstone check
+tombstone build
 tombstone migrate
 tombstone migrate:rollback
 tombstone migrate:status

@@ -1,8 +1,30 @@
 import "fs" as fs;
+from "./lib" import system_env;
 from "./generator" import make_controller, make_model, make_migration, make_factory, make_action, make_resource;
+
+function json_escape(s: String) -> String {
+    var out = "";
+    for each c in (s.toChar()) {
+        if (ord(c) == 92) { out = out + "\\\\"; }
+        elif (ord(c) == 34) { out = out + "\\\""; }
+        else { out = out + c.toString(); };
+    };
+    return out;
+}
+
+function generated_path_modules() -> String {
+    var mod_dir = system_env("TOMBSTONE_MODULE_DIR");
+    if (mod_dir == "") { return ""; };
+    var framework = json_escape(mod_dir + "/..");
+    var repo = json_escape(mod_dir + "/../../../../modules");
+    return ",\n  \"pathModules\": [\"" + framework + "\", \"" + repo + "\"]";
+}
 
 function usage() {
     print("Uso: tombstone <comando>");
+    print("  serve [puerto]          (launcher)");
+    print("  test | test:unit | test:db | test:http | test:all  (launcher)");
+    print("  check [--strict] | build  (launcher)");
     print("  create app [--force]");
     print("  make:controller <Nombre>");
     print("  make:model <Nombre>");
@@ -22,12 +44,12 @@ function make_command(cmd: String, args: String[]) -> int {
     for each a in (args) {
         if (a == "--force" || a == "-f") { force = true; };
     };
-    if (cmd == "make:controller") { return make_controller(name, force); };
-    if (cmd == "make:model") { return make_model(name, force); };
-    if (cmd == "make:migration") { return make_migration(name, force); };
-    if (cmd == "make:factory") { return make_factory(name, force); };
-    if (cmd == "make:action") { return make_action(name, force); };
-    if (cmd == "make:resource") { return make_resource(name, force); };
+    if (cmd == "make:controller") { make_controller(name, force); return 0; };
+    if (cmd == "make:model") { make_model(name, force); return 0; };
+    if (cmd == "make:migration") { make_migration(name, force); return 0; };
+    if (cmd == "make:factory") { make_factory(name, force); return 0; };
+    if (cmd == "make:action") { make_action(name, force); return 0; };
+    if (cmd == "make:resource") { make_resource(name, force); return 0; };
     print("Comando desconocido: " + cmd);
     return 1;
 };
@@ -52,24 +74,32 @@ function create_app(args: String[]) -> int {
         "{\n" +
         "  \"name\": \"tombstone-app\",\n" +
         "  \"version\": \"0.1.0\",\n" +
-        "  \"entry\": \"app/main.clsx\",\n" +
+        "  \"entry\": \"app/main.clsx\"" +
+        generated_path_modules() + ",\n" +
         "  \"dependencies\": {\"tombstone\": \"^0.2.0\"}\n" +
         "}\n");
     fs.writeFile("app/main.clsx",
         "from \"tombstone\" import App, TestClient, serve;\n" +
         "from \"./routes/index\" import register_routes;\n\n" +
         "function main(args: String[]) -> int {\n" +
+        "    var port = 3000;\n" +
+        "    var test_mode = false;\n" +
+        "    for each a in (args) {\n" +
+        "        if (a == \"test\") {\n" +
+        "            test_mode = true;\n" +
+        "        } elif (a != \"\") {\n" +
+        "            port = int(a);\n" +
+        "        };\n" +
+        "    };\n" +
         "    var app = App();\n" +
         "    register_routes(app);\n" +
-        "    if (args.length > 0 && args[0] == \"test\") {\n" +
+        "    if (test_mode) {\n" +
         "        var client = TestClient(app);\n" +
         "        client.get(\"/\").assert_status(200);\n" +
         "        client.get(\"/no-existe\").assert_status(404).assert_contains(\"Pagina no encontrada\");\n" +
         "        print(\"OK: app\");\n" +
         "        return 0;\n" +
         "    };\n" +
-        "    var port = 3000;\n" +
-        "    if (args.length > 0) { port = int(args[0]); };\n" +
         "    return serve(app, port);\n" +
         "};\n");
     fs.writeFile("app/routes/index.clsx",
@@ -136,6 +166,109 @@ function create_app(args: String[]) -> int {
         "    if (e.get(\"APP_ENV\") != \"\") { c.environment = e.get(\"APP_ENV\"); };\n" +
         "    return c;\n" +
         "};\n");
+    var db_config: String[] = [
+        "from \"./environment\" import load_env;",
+        "",
+        "export class DatabaseConfig { public var path: String; };",
+        "",
+        "export function load_database_config() -> DatabaseConfig {",
+        "    var values = load_env();",
+        "    var c = DatabaseConfig();",
+        "    c.path = \":memory:\";",
+        "    if (values.get(\"DB_PATH\") != \"\") { c.path = values.get(\"DB_PATH\"); };",
+        "    return c;",
+        "};"
+    ];
+    fs.writeFile("config/cls.json",
+        "{\n" +
+        "  \"name\": \"app-config\",\n" +
+        "  \"version\": \"0.1.0\",\n" +
+        "  \"export\": {\"entry\": \"app.clsx\"}\n" +
+        "}\n");
+    fs.writeFile("config/database.clsx", db_config.join("\n") + "\n");
+
+    var db_module: String[] = [
+        "import \"sqlite\" as sqlite;",
+        "from \"tombstone\" import Database;",
+        "from \"../config/database\" import load_database_config;",
+        "",
+        "export function connect() -> Database {",
+        "    var c = load_database_config();",
+        "    var db = Database(sqlite::SqliteDriver());",
+        "    db.connect(c.path);",
+        "    return db;",
+        "};"
+    ];
+    fs.writeFile("database/cls.json",
+        "{\n" +
+        "  \"name\": \"app-database\",\n" +
+        "  \"version\": \"0.1.0\",\n" +
+        "  \"export\": {\"entry\": \"database.clsx\"}\n" +
+        "}\n");
+    fs.writeFile("database/database.clsx", db_module.join("\n") + "\n");
+
+    var migrations_index: String[] = [
+        "from \"tombstone\" import MigrationRunner;",
+        "",
+        "export function register_migrations(runner: MigrationRunner) -> MigrationRunner {",
+        "    return runner;",
+        "};"
+    ];
+    fs.writeFile("database/migrations/index.clsx", migrations_index.join("\n") + "\n");
+
+    var seeder: String[] = [
+        "from \"tombstone\" import Database, Seeder;",
+        "",
+        "export class DatabaseSeeder: Seeder {",
+        "    function run(db: Database) -> int { return 0; }",
+        "};"
+    ];
+    fs.writeFile("database/seeds/DatabaseSeeder.clsx", seeder.join("\n") + "\n");
+    var app_console: String[] = [
+        "import \"sqlite\" as sqlite;",
+        "from \"tombstone\" import Database, MigrationRunner;",
+        "from \"tombstone\" import make_controller, make_model, make_migration, make_factory, make_action, make_resource;",
+        "from \"../config/database\" import load_database_config;",
+        "from \"../database/migrations/index\" import register_migrations;",
+        "from \"../database/seeds/DatabaseSeeder\" import DatabaseSeeder;",
+        "",
+        "function connect() -> Database {",
+        "    var c = load_database_config();",
+        "    var db = Database(sqlite::SqliteDriver());",
+        "    db.connect(c.path);",
+        "    return db;",
+        "};",
+        "",
+        "function make_command(cmd: String, args: String[]) -> int {",
+        "    if (args.length < 2) { print(\"Falta el nombre: \" + cmd + \" <Nombre>\"); return 1; };",
+        "    var name = args[1];",
+        "    var force = false;",
+        "    for each a in (args) { if (a == \"--force\" || a == \"-f\") { force = true; }; };",
+        "    if (cmd == \"make:controller\") { make_controller(name, force); return 0; };",
+        "    if (cmd == \"make:model\") { make_model(name, force); return 0; };",
+        "    if (cmd == \"make:migration\") { make_migration(name, force); return 0; };",
+        "    if (cmd == \"make:factory\") { make_factory(name, force); return 0; };",
+        "    if (cmd == \"make:action\") { make_action(name, force); return 0; };",
+        "    if (cmd == \"make:resource\") { make_resource(name, force); return 0; };",
+        "    print(\"Comando desconocido: \" + cmd);",
+        "    return 1;",
+        "};",
+        "",
+        "function main(args: String[]) -> int {",
+        "    if (args.length == 0) { print(\"Uso: tombstone <comando>\"); return 1; };",
+        "    var cmd = args[0];",
+        "    if (cmd.startsWith(\"make:\")) { return make_command(cmd, args); };",
+        "    var db = connect();",
+        "    var runner = register_migrations(MigrationRunner(db.orm));",
+        "    if (cmd == \"migrate\") { print(\"migrated:\" + runner.run().toString()); return 0; };",
+        "    if (cmd == \"migrate:rollback\") { var n = runner.rollback(); print(\"rolled_back:\" + n.toString()); return 0; };",
+        "    if (cmd == \"migrate:status\") { var st = runner.status(); if (st.length == 0) { print(\"no migrations\"); }; for each s in (st) { print(s); }; return 0; };",
+        "    if (cmd == \"db:seed\") { runner.run(); var n = DatabaseSeeder().run(db); print(\"seeded:\" + n.toString()); return 0; };",
+        "    print(\"Comando desconocido: \" + cmd);",
+        "    return 1;",
+        "};"
+    ];
+    fs.writeFile("app/console.clsx", app_console.join("\n") + "\n");
     fs.writeFile(".env.example", "APP_NAME=Tombstone App\nAPP_ENV=development\nDB_PATH=:memory:\n");
     fs.writeFile(".gitignore", "dist/\nmodules/\n.cls-cache/\n.env\n*.db\n");
     fs.writeFile("README.md",

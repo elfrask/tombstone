@@ -81,6 +81,17 @@ function action_class(name: String) -> String {
     return c + "Action";
 }
 
+# Layout del proyecto: `app/` (create-tombstone-app) o `src/` (demo).
+function layout_root() -> String {
+    if (fs.exists("app")) { return "app"; };
+    return "src";
+}
+
+function migrations_root() -> String {
+    if (fs.exists("database/migrations")) { return "database/migrations"; };
+    return "src/migrations";
+}
+
 function output(path: String, body: String, force: bool) -> int {
     if (fs.exists(path) && !force) {
         print("skip: " + path);
@@ -93,7 +104,8 @@ function output(path: String, body: String, force: bool) -> int {
 
 export function make_controller(name: String, force: bool) -> int {
     var cls = controller_class(name);
-    fs.mkdir("src/controllers");
+    var root = layout_root();
+    fs.mkdir(root + "/controllers");
     var body =
         "from \"tombstone\" import Controller, Request, Response;\n\n" +
         "export class " + cls + ": Controller {\n" +
@@ -101,13 +113,14 @@ export function make_controller(name: String, force: bool) -> int {
         "        return Response.text(\"" + cls + "\");\n" +
         "    }\n" +
         "};\n";
-    return output("src/controllers/" + cls + ".clsx", body, force);
+    return output(root + "/controllers/" + cls + ".clsx", body, force);
 }
 
 export function make_model(name: String, force: bool) -> int {
     var cls = pascal(name);
     var table = snake(plural(name));
-    fs.mkdir("src/models");
+    var root = layout_root();
+    fs.mkdir(root + "/models");
     var body =
         "import \"orm\" as orm;\n" +
         "from \"tombstone\" import Model;\n\n" +
@@ -129,7 +142,7 @@ export function make_model(name: String, force: bool) -> int {
         "        me.uses_soft_deletes = false;\n" +
         "    }\n" +
         "};\n";
-    return output("src/models/" + cls + ".clsx", body, force);
+    return output(root + "/models/" + cls + ".clsx", body, force);
 }
 
 export function make_migration(name: String, force: bool) -> int {
@@ -137,7 +150,8 @@ export function make_migration(name: String, force: bool) -> int {
     var stamp = now().toString();
     var migration_name = stamp + "_" + snake(name);
     var table = snake(plural(name));
-    fs.mkdir("src/migrations");
+    var root = migrations_root();
+    fs.mkdir(root);
     var body =
         "from \"tombstone\" import DbSchema, Migration;\n\n" +
         "export class " + cls + ": Migration {\n" +
@@ -152,12 +166,13 @@ export function make_migration(name: String, force: bool) -> int {
         "    }\n\n" +
         "    function down(schema: DbSchema) -> int { return schema.drop(\"" + table + "\"); }\n" +
         "};\n";
-    return output("src/migrations/" + migration_name + ".clsx", body, force);
+    return output(root + "/" + migration_name + ".clsx", body, force);
 }
 
 export function make_factory(name: String, force: bool) -> int {
     var cls = pascal(name) + "Factory";
-    fs.mkdir("src/factories");
+    var root = layout_root();
+    fs.mkdir(root + "/factories");
     var body =
         "from \"tombstone\" import Factory, Model;\n\n" +
         "export class " + cls + ": Factory {\n" +
@@ -175,24 +190,26 @@ export function make_factory(name: String, force: bool) -> int {
         "        return r;\n" +
         "    }\n" +
         "};\n";
-    return output("src/factories/" + cls + ".clsx", body, force);
+    return output(root + "/factories/" + cls + ".clsx", body, force);
 }
 
 export function make_action(name: String, force: bool) -> int {
     var cls = action_class(name);
-    fs.mkdir("src/actions");
+    var root = layout_root();
+    fs.mkdir(root + "/actions");
     var body =
         "from \"tombstone\" import Action;\n\n" +
         "export class " + cls + ": Action {\n" +
         "    function name() -> String { return \"" + snake(name) + "\"; }\n" +
         "    function handle(input: String) -> String { return input; }\n" +
         "};\n";
-    return output("src/actions/" + cls + ".clsx", body, force);
+    return output(root + "/actions/" + cls + ".clsx", body, force);
 }
 
 export function make_resource(name: String, force: bool) -> int {
     var cls = pascal(name) + "Resource";
-    fs.mkdir("src/resources");
+    var root = layout_root();
+    fs.mkdir(root + "/resources");
     var body =
         "from \"tombstone\" import ModelRow, Resource;\n\n" +
         "export class " + cls + ": Resource {\n" +
@@ -200,5 +217,5 @@ export function make_resource(name: String, force: bool) -> int {
         "        return row.to_record();\n" +
         "    }\n" +
         "};\n";
-    return output("src/resources/" + cls + ".clsx", body, force);
+    return output(root + "/resources/" + cls + ".clsx", body, force);
 }

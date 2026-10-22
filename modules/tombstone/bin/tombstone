@@ -1,18 +1,181 @@
 #!/usr/bin/env sh
 # tombstone - launcher del modulo (no pertenece a clx).
+#
+# Comandos de aplicacion (los ejecuta el launcher con clx):
+#   tombstone serve [puerto]     inicia el servidor
+#   tombstone test               autotest in-process de la app
+#   tombstone test:unit          tests de tests/unit
+#   tombstone test:db            tests de tests/db (si existe el runner)
+#   tombstone test:http          smoke HTTP (si existe el runner)
+#   tombstone test:all           unit + app + db/http disponibles
+#   tombstone check [--strict]   typecheck de app/ o src/
+#   tombstone build [args]       empaqueta el .clsapp
+#
+# Comandos de consola (los ejecuta el console.clsx del proyecto o del modulo):
+#   migrate, migrate:rollback, migrate:status, db:seed
+#   make:controller|model|migration|factory|action|resource
+#   create app
 set -eu
+
 MODULE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 if [ -f "$HOME/.cls/bin/.tombstone-home" ]; then
     MODULE_DIR="$(cat "$HOME/.cls/bin/.tombstone-home")"
 fi
+
 CLX_BIN="${CLX:-clx}"
-if [ -f "src/console.clsx" ]; then
-    CONSOLE="src/console.clsx"
-else
-    CONSOLE="${TOMBSTONE_CONSOLE:-$MODULE_DIR/console.clsx}"
-fi
 if ! command -v "$CLX_BIN" >/dev/null 2>&1; then
     echo "tombstone: no se encontro '$CLX_BIN' (usa CLX=/ruta/a/clx)" >&2
     exit 127
 fi
-exec "$CLX_BIN" run "$CONSOLE" -- "$@"
+
+TOMBSTONE_MODULE_DIR="$MODULE_DIR"
+export TOMBSTONE_MODULE_DIR
+
+ENTRY=""
+if [ -f "app/main.clsx" ]; then
+    ENTRY="app/main.clsx"
+elif [ -f "src/main.clsx" ]; then
+    ENTRY="src/main.clsx"
+fi
+
+APPDIR="."
+if [ -d "app" ]; then
+    APPDIR="app"
+elif [ -d "src" ]; then
+    APPDIR="src"
+fi
+
+if [ -f "src/console.clsx" ]; then
+    CONSOLE="src/console.clsx"
+elif [ -f "app/console.clsx" ]; then
+    CONSOLE="app/console.clsx"
+else
+    CONSOLE="${TOMBSTONE_CONSOLE:-$MODULE_DIR/console.clsx}"
+fi
+
+usage() {
+    cat <<'EOF'
+Uso: tombstone <comando> [args]
+
+Servidor y build:
+  serve [puerto]          Inicia el servidor (default 3000)
+  check [--strict]        Verifica tipos de app/ o src/
+  build [args]            Empaqueta la app en .clsapp
+
+Tests:
+  test                    Autotest in-process de la app
+  test:unit               Ejecuta tests/unit/**/*.clsx
+  test:db                 Ejecuta tests/db (si hay runner)
+  test:http               Ejecuta tests/integration (si hay runner)
+  test:all                unit + app + db/http disponibles
+
+Base de datos y generadores:
+  migrate
+  migrate:rollback
+  migrate:status
+  db:seed
+  make:controller <Nombre>
+  make:model <Nombre>
+  make:migration <nombre>
+  make:factory <Nombre>
+  make:action <Nombre>
+  make:resource <Nombre>
+  create app [--force]
+
+Otros:
+  help                    Muestra esta ayuda
+  version                 Muestra la version de Tombstone
+EOF
+}
+
+need_entry() {
+    if [ -z "$ENTRY" ]; then
+        echo "tombstone: no encontre app/main.clsx ni src/main.clsx" >&2
+        exit 2
+    fi
+}
+
+run_test_script() {
+    label="$1"
+    ps="$2"
+    sh="$3"
+    if [ -f "$sh" ]; then
+        bash "$sh"
+        return $?
+    fi
+    if [ -f "$ps" ]; then
+        if command -v powershell >/dev/null 2>&1; then
+            powershell -ExecutionPolicy Bypass -File "$ps"
+            return $?
+        fi
+        if command -v pwsh >/dev/null 2>&1; then
+            pwsh -File "$ps"
+            return $?
+        fi
+    fi
+    echo "tombstone: no hay runner para $label" >&2
+    return 2
+}
+
+cmd="${1:-}"
+if [ "$#" -gt 0 ]; then shift; fi
+
+case "$cmd" in
+    ""|help|-h|--help)
+        usage
+        exit 0
+        ;;
+    version|-v|--version)
+        ver="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$MODULE_DIR/cls.json" 2>/dev/null | head -n 1 || true)"
+        echo "tombstone ${ver:-0.2.0}"
+        exit 0
+        ;;
+    serve|run|start)
+        need_entry
+        port="${1:-3000}"
+        exec "$CLX_BIN" run "$ENTRY" -- "$port"
+        ;;
+    test|test:app)
+        need_entry
+        exec "$CLX_BIN" run "$ENTRY" -- test
+        ;;
+    test:unit)
+        if [ ! -d "tests/unit" ] || ! find "tests/unit" -name '*.clsx' -print -quit | grep -q .; then
+            echo "tombstone: no hay tests en tests/unit"
+            exit 0
+        fi
+        exec "$CLX_BIN" test "tests/unit/**/*.clsx"
+        ;;
+    test:db)
+        run_test_script "tests/db" "tests/db/run.ps1" "tests/db/run.sh"
+        exit $?
+        ;;
+    test:http)
+        run_test_script "tests/integration" "tests/integration/http_smoke.ps1" "tests/integration/http_smoke.sh"
+        exit $?
+        ;;
+    test:all)
+        need_entry
+        if [ -d "tests/unit" ] && find "tests/unit" -name '*.clsx' -print -quit | grep -q .; then
+            "$CLX_BIN" test "tests/unit/**/*.clsx" || exit $?
+        fi
+        "$CLX_BIN" run "$ENTRY" -- test || exit $?
+        if [ -f "tests/db/run.ps1" ] || [ -f "tests/db/run.sh" ]; then
+            run_test_script "tests/db" "tests/db/run.ps1" "tests/db/run.sh" || exit $?
+        fi
+        if [ -f "tests/integration/http_smoke.ps1" ] || [ -f "tests/integration/http_smoke.sh" ]; then
+            run_test_script "tests/integration" "tests/integration/http_smoke.ps1" "tests/integration/http_smoke.sh" || exit $?
+        fi
+        exit 0
+        ;;
+    check)
+        target="${ENTRY:-$APPDIR}"
+        exec "$CLX_BIN" check "$target" "$@"
+        ;;
+    build)
+        exec "$CLX_BIN" build "$@"
+        ;;
+    *)
+        exec "$CLX_BIN" run "$CONSOLE" -- "$cmd" "$@"
+        ;;
+esac

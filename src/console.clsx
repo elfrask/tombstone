@@ -17,6 +17,9 @@ from "./seeders" import UserSeeder, NoteSeeder;
 
 function usage() {
     print("Uso: tombstone <comando>");
+    print("  serve [puerto]          (launcher)");
+    print("  test | test:unit | test:db | test:http | test:all  (launcher)");
+    print("  check [--strict] | build  (launcher)");
     print("  migrate");
     print("  migrate:rollback");
     print("  migrate:status");
@@ -65,12 +68,12 @@ function make_command(cmd: String, args: String[]) -> int {
     for each a in (args) {
         if (a == "--force" || a == "-f") { force = true; };
     };
-    if (cmd == "make:controller") { return make_controller(name, force); };
-    if (cmd == "make:model") { return make_model(name, force); };
-    if (cmd == "make:migration") { return make_migration(name, force); };
-    if (cmd == "make:factory") { return make_factory(name, force); };
-    if (cmd == "make:action") { return make_action(name, force); };
-    if (cmd == "make:resource") { return make_resource(name, force); };
+    if (cmd == "make:controller") { make_controller(name, force); return 0; };
+    if (cmd == "make:model") { make_model(name, force); return 0; };
+    if (cmd == "make:migration") { make_migration(name, force); return 0; };
+    if (cmd == "make:factory") { make_factory(name, force); return 0; };
+    if (cmd == "make:action") { make_action(name, force); return 0; };
+    if (cmd == "make:resource") { make_resource(name, force); return 0; };
     print("Comando desconocido: " + cmd);
     return 1;
 };

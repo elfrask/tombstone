@@ -21,10 +21,11 @@
 #   POST /api/notes/{id}/restore restaura una nota
 #   GET  /api/notes/{id}   nota por id (Model)
 #   GET  /public/*         archivos estáticos (fs del nodo)
+import "fs" as fs;
 import "sqlite" as sqlite;
 from "tombstone" import App, Controller, Request, Response, CorsOptions, CookieOptions, Template;
 from "tombstone" import render, json_response, json_response_raw, json_string_array;
-from "tombstone" import parse_cookies, serialize_cookie, system_pid, system_uptime_ms;
+from "tombstone" import parse_cookies, serialize_cookie, system_pid, system_uptime_ms, system_env;
 from "tombstone" import Database, MigrationRunner, serve;
 from "./config" import load_config;
 from "./services" import bootstrap, ApplicationServices;
@@ -33,9 +34,16 @@ from "./controllers" import RegistrationController, NotesController, AuthControl
 from "./migrations" import CreateInitialSchema, CreateSessions, AddUserRole;
 from "./views" import Landing, LandingPageProps, Gallery, GalleryPageProps;
 
-# Los shims de `fs` y `socket` se resuelven relativos al CWD: este demo se
-# ejecuta desde la raíz del repo CLS.
-const PUBLIC_DIR = "cls-repositories/tombstone/public";
+# `public/` se resuelve desde la raíz del proyecto o desde la raíz del repo CLS.
+function public_dir() -> String {
+    var configured = system_env("TOMBSTONE_PUBLIC_DIR");
+    if (configured != "") { return configured; };
+    if (fs.exists("public")) { return "public"; };
+    if (fs.exists("cls-repositories/tombstone/public")) {
+        return "cls-repositories/tombstone/public";
+    };
+    return "public";
+};
 
 # Resumen de una respuesta para el autotest (no imprime el body completo).
 function summary(label: String, res: Response) -> String {
@@ -68,8 +76,13 @@ function page_template(title: String, description: String) -> Template {
 
 function main(args: String[]) -> int {
     var port = 8080;
-    if (args.length > 0) {
-        port = int(args[0]);
+    var test_mode = false;
+    for each a in (args) {
+        if (a == "test") {
+            test_mode = true;
+        } elif (a != "") {
+            port = int(a);
+        };
     };
 
     print("=== Tombstone ===");
@@ -103,7 +116,7 @@ function main(args: String[]) -> int {
         services.logger.info("-> " + req.http_method + " " + req.path);
         return Response.status_only(0);
     });
-    app.serve_static("/public", PUBLIC_DIR);
+    app.serve_static("/public", public_dir());
     # Landing: componentes CMX (NavBar/HeroBanner/TerminalPanel/SiteFooter).
     app.get("/", (req: Request) -> Response {
         var landing: LandingPageProps = { id: "top" };
@@ -176,7 +189,7 @@ function main(args: String[]) -> int {
     });
 
     # Modo autotest: procesa requests en memoria (sin sockets).
-    if (args.length > 1 && args[1] == "test") {
+    if (test_mode) {
         print("--- autotest ---");
         print(summary("GET /api/health", app.handle("GET /api/health HTTP/1.1\r\nHost: x\r\n\r\n")));
         print(summary("GET /", app.handle("GET / HTTP/1.1\r\nHost: x\r\n\r\n")));
